@@ -1,0 +1,49 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Dispara quando uma tag começando com 'v' for criada (ex: v1.0.0)
+
+jobs:
+  build-and-release:
+    name: Build and Publish Release
+    runs-on: windows-latest
+    permissions:
+      contents: write # Necessário para criar a release
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish Executable
+        run: dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+
+      - name: Rename Executable
+        run: |
+          # Recupera a versão a partir do nome da tag (ex: v1.0.0)
+          $version = "${{ github.ref_name }}"
+          $exeName = "ScreenToRTSP-$version.exe"
+          $sourcePath = "bin\Release\net10.0-windows\win-x64\publish\ScreenToRTSP.exe"
+          
+          # Move e renomeia o arquivo para a raiz com a versão embutida
+          if (Test-Path $sourcePath) {
+            Move-Item -Path $sourcePath -Destination ".\$exeName"
+            Write-Host "Executável renomeado para $exeName com sucesso."
+          } else {
+            Write-Error "Não foi possível encontrar o executável publicado no caminho $sourcePath"
+            exit 1
+          }
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: ScreenToRTSP-${{ github.ref_name }}.exe
+          generate_release_notes: true
+          draft: false
+          prerelease: false
