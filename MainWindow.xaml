@@ -415,13 +415,14 @@
         <!-- Fixed Bottom Status & Action Bar -->
         <Border
             Grid.Row="2"
+            Height="88"
             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
             BorderThickness="0,1,0,0"
             Padding="24,14">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
-                <!-- Left: Status + RTSP Links + Copy Buttons -->
-                <StackPanel Grid.Column="0" Spacing="6" VerticalAlignment="Center">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20" VerticalAlignment="Center">
+                <!-- Left: Status + RTSP Links -->
+                <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                         <Ellipse
                             x:Name="StatusDot"
@@ -437,46 +438,49 @@
                             VerticalAlignment="Center" />
                     </StackPanel>
 
-                    <TextBlock
-                        x:Name="lblUrl"
-                        Text="Os links da câmera aparecerão aqui."
-                        FontSize="12"
-                        FontFamily="Consolas"
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        IsTextSelectionEnabled="True"
-                        TextWrapping="Wrap" />
-
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button x:Name="btnCopyLan" Visibility="Collapsed" Padding="10,4" FontSize="12">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <FontIcon Glyph="&#xE8C8;" FontSize="12" />
-                                <TextBlock x:Name="LblBtnCopyLan" Text="Copiar Link Principal" />
-                            </StackPanel>
-                        </Button>
-                        <Button x:Name="btnCopyLocal" Visibility="Collapsed" Padding="10,4" FontSize="12">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <FontIcon Glyph="&#xE8C8;" FontSize="12" />
-                                <TextBlock x:Name="LblBtnCopyLocal" Text="Copiar Link Leve" />
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
+                    <Grid Height="34">
+                        <TextBlock
+                            x:Name="lblUrl"
+                            Text="Os links da câmera aparecerão aqui."
+                            FontSize="12"
+                            LineHeight="17"
+                            FontFamily="Consolas"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            IsTextSelectionEnabled="True"
+                            TextWrapping="Wrap"
+                            VerticalAlignment="Center" />
+                    </Grid>
                 </StackPanel>
 
-                <!-- Right: Start / Stop Primary Button -->
-                <Button
-                    x:Name="btnStart"
-                    Grid.Column="1"
-                    Style="{StaticResource AccentButtonStyle}"
-                    MinWidth="200"
-                    Height="44"
-                    FontWeight="SemiBold"
-                    FontSize="14"
-                    VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <FontIcon x:Name="IconBtnStart" Glyph="&#xE768;" FontSize="14" />
-                        <TextBlock x:Name="LblBtnStart" Text="Iniciar Transmissão" />
-                    </StackPanel>
-                </Button>
+                <!-- Right: Copy Buttons + Start / Stop Primary Button -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Button x:Name="btnCopyLan" Visibility="Collapsed" Height="44" Padding="12,0" FontSize="13">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE8C8;" FontSize="13" />
+                            <TextBlock x:Name="LblBtnCopyLan" Text="Principal" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="btnCopyLocal" Visibility="Collapsed" Height="44" Padding="12,0" FontSize="13">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE8C8;" FontSize="13" />
+                            <TextBlock x:Name="LblBtnCopyLocal" Text="Leve" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button
+                        x:Name="btnStart"
+                        Style="{StaticResource AccentButtonStyle}"
+                        MinWidth="190"
+                        Height="44"
+                        FontWeight="SemiBold"
+                        FontSize="14"
+                        VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon x:Name="IconBtnStart" Glyph="&#xE768;" FontSize="14" />
+                            <TextBlock x:Name="LblBtnStart" Text="Iniciar Transmissão" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
             </Grid>
         </Border>
 

@@ -412,29 +412,28 @@ namespace ScreenToRTSP.UI
                             string btnClass = isTransmitting ? "btn-stop" : "btn-start";
 
                             string linksHtml = "";
+                            string copyBtnsHtml = "";
                             if (isTransmitting)
                             {
-                                linksHtml += $@"<div class='links-card' style='text-align:left; font-size:14px; margin-top:15px; padding:10px; border-radius:5px;'>
-                                    <b>Principal:</b> <a href='{lanUrl}' style='color:#3b82f6; text-decoration:none;'>{lanUrl}</a><br>";
+                                linksHtml += $@"<div class='links-card' style='text-align:left; font-size:14px; line-height:20px; margin-top:15px; padding:10px; border-radius:5px; height:40px; display:flex; flex-direction:column; justify-content:center;'>
+                                    <div><b>Principal:</b> <a href='{lanUrl}' style='color:#3b82f6; text-decoration:none;'>{lanUrl}</a></div>";
                                 if (dualOn)
                                 {
-                                    linksHtml += $"<b>Leve:</b> <a href='{lanLowUrl}' style='color:#3b82f6; text-decoration:none;'>{lanLowUrl}</a>";
+                                    linksHtml += $"<div><b>Leve:</b> <a href='{lanLowUrl}' style='color:#3b82f6; text-decoration:none;'>{lanLowUrl}</a></div>";
                                 }
                                 linksHtml += "</div>";
 
+                                copyBtnsHtml += $@"<button type='button' class='btn-outline' style='width:auto; flex:0 0 auto; font-size:14px; margin:0; padding:12px 14px;' onclick=""copyText('{lanUrl}')"">📋 {LanguageManager.Get("BtnCopyLan")}</button>";
                                 if (dualOn)
                                 {
-                                    linksHtml += $@"<div class='flex' style='margin-top:10px;'>
-                                        <div><button type='button' class='btn-outline' style='font-size:14px; margin-bottom:0; padding:10px 5px;' onclick=""copyText('{lanUrl}')"">📋 {LanguageManager.Get("BtnCopyLan")}</button></div>
-                                        <div><button type='button' class='btn-outline' style='font-size:14px; margin-bottom:0; padding:10px 5px;' onclick=""copyText('{lanLowUrl}')"">📋 {LanguageManager.Get("BtnCopyLocal")}</button></div>
-                                    </div>";
+                                    copyBtnsHtml += $@"<button type='button' class='btn-outline' style='width:auto; flex:0 0 auto; font-size:14px; margin:0; padding:12px 14px;' onclick=""copyText('{lanLowUrl}')"">📋 {LanguageManager.Get("BtnCopyLocal")}</button>";
                                 }
-                                else
-                                {
-                                    linksHtml += $@"<div style='margin-top:10px;'>
-                                        <button type='button' class='btn-outline' style='font-size:14px; margin-bottom:0;' onclick=""copyText('{lanUrl}')"">📋 {LanguageManager.Get("BtnCopyLan")}</button>
-                                    </div>";
-                                }
+                            }
+                            else
+                            {
+                                linksHtml += $@"<div class='links-card' style='text-align:center; font-size:14px; line-height:20px; margin-top:15px; padding:10px; border-radius:5px; height:40px; display:flex; flex-direction:column; justify-content:center; opacity:0.6;'>
+                                    <div>{LanguageManager.Get("StatusWaitingLinks")}</div>
+                                </div>";
                             }
 
                             string updateHtml = "";
@@ -569,7 +568,8 @@ namespace ScreenToRTSP.UI
                                         <input type='hidden' name='action' value='{btnAction}'/>
                                         <button class='{btnClass}' style='margin:0;'>{btnText}</button>
                                     </form>
-                                    {(isTransmitting ? $"<button type='button' class='btn-outline' onclick=\"showPreview()\" style='flex:1; margin:0;'>📺 {LanguageManager.Get("TabPreview")}</button>" : "")} 
+                                    {copyBtnsHtml}
+                                    {(isTransmitting ? $"<button type='button' class='btn-outline' onclick=\"showPreview()\" style='width:auto; flex:0 0 auto; padding:12px 14px; margin:0;'>📺 {LanguageManager.Get("TabPreview")}</button>" : "")} 
                                 </div>
                                 
                                 <hr>
