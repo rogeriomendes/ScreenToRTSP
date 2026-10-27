@@ -1,66 +1,57 @@
 using System;
-using System.Linq;
-using System.Windows.Forms;
+using System.IO;
+using System.Threading;
+using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml;
+using ScreenToRTSP.Core;
 
 namespace ScreenToRTSP
 {
     internal static class Program
     {
-                static System.Threading.Mutex mutex = new System.Threading.Mutex(true, "{0FF32F1A-B829-450F-A9D4-ScreenToRTSP}");
+        private static readonly Mutex mutex = new Mutex(true, "{0FF32F1A-B829-450F-A9D4-ScreenToRTSP}");
 
         [STAThread]
         static void Main(string[] args)
         {
             if (!mutex.WaitOne(TimeSpan.Zero, true))
             {
-                MessageBox.Show("O ScreenToRTSP já está em execução.\nPor favor, verifique a bandeja do sistema (perto do relógio).", "Screen to RTSP", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MonitorHelper.ShowMessage(
+                    "O ScreenToRTSP já está em execução.\nPor favor, verifique a bandeja do sistema (perto do relógio).",
+                    "Screen to RTSP",
+                    MonitorHelper.MB_ICONINFORMATION);
                 return;
             }
 
-            Application.ThreadException += (sender, e) => {
-                string p = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash.log");
-                System.IO.File.WriteAllText(p, e.Exception.ToString());
-                MessageBox.Show(e.Exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+            {
+                try
+                {
+                    string p = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash.log");
+                    File.WriteAllText(p, e.ExceptionObject.ToString());
+                    MonitorHelper.ShowMessage(e.ExceptionObject.ToString(), "Error", MonitorHelper.MB_ICONERROR);
+                }
+                catch { }
             };
-            AppDomain.CurrentDomain.UnhandledException += (sender, e) => {
-                string p = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash.log");
-                System.IO.File.WriteAllText(p, e.ExceptionObject.ToString());
-                MessageBox.Show(e.ExceptionObject.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            };
 
-            try {
-                ApplicationConfiguration.Initialize();
-                
-                if (!ScreenToRTSP.Core.DependencyManager.CheckAndDownloadDependencies())
-                {
-                    return;
-                }
+            try
+            {
+                App.StartupArgs = args ?? Array.Empty<string>();
+                WinRT.ComWrappersSupport.InitializeComWrappers();
 
-                var form = new Main();
-            
-                if (args.Contains("--minimized"))
+                Application.Start((p) =>
                 {
-                    form.WindowState = FormWindowState.Minimized;
-                    form.ShowInTaskbar = false;
-                    form.Load += (s, e) => {
-                        form.Hide();
-                        form.StartAuto();
-                    };
-                }
-                else if (args.Contains("--resume"))
-                {
-                    form.Load += (s, e) => {
-                        form.StartClick();
-                    };
-                }
-
-                Application.Run(form);
-            } catch (Exception ex) {
-                string p = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash.log");
-                System.IO.File.WriteAllText(p, ex.ToString());
-                MessageBox.Show(ex.Message, "Fatal Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    var context = new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread());
+                    SynchronizationContext.SetSynchronizationContext(context);
+                    _ = new App();
+                });
+            }
+            catch (Exception ex)
+            {
+                string p = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash.log");
+                File.WriteAllText(p, ex.ToString());
+                MonitorHelper.ShowMessage(ex.Message, "Fatal Error", MonitorHelper.MB_ICONERROR);
             }
         }
     }
 }
-

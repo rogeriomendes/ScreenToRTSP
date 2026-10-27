@@ -1,70 +1,47 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
-using System.Reflection;
-using System.Windows.Forms;
-using Microsoft.Win32;
 using System.Net;
-using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.UI;
+using Microsoft.UI.Dispatching;
+using Microsoft.UI.Windowing;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.Win32;
 using ScreenToRTSP.Core;
 using ScreenToRTSP.I18n;
 using ScreenToRTSP.UI;
+using Windows.ApplicationModel.DataTransfer;
+using Windows.Graphics;
+using Windows.UI;
 
 namespace ScreenToRTSP
 {
-    public partial class Main : Form
+    public sealed partial class Main : Window
     {
-        internal TextBox txtStreamName;
-        internal CheckBox chkAuth;
-        internal CheckBox chkDualStream;
-        internal CheckBox chkMouseCursor;
-        internal CheckBox chkSchedule;
-        internal MaskedTextBox txtScheduleStart;
-        internal MaskedTextBox txtScheduleEnd;
-        internal TextBox txtPort;
-        internal TextBox txtUsername;
-        internal TextBox txtPassword;
-        internal ComboBox cmbLanguage;
-        internal CheckBox chkStartWithWindows;
-        internal Button btnStart;
-        internal Label lblStatus;
-        internal Label lblUrl;
-        internal Label lblWebUrl;
-        internal NotifyIcon trayIcon;
-        
-        
-        internal System.Windows.Forms.Timer watchdogTimer;
+        internal TrayIconService trayIcon;
+        internal DispatcherQueueTimer watchdogTimer;
+        internal DispatcherQueueTimer autoSaveTimer;
+        internal DispatcherQueueTimer saveStatusTimer;
+        internal DispatcherQueueTimer portTypingTimer;
+
         internal bool isTransmitting = false;
         internal bool isForceClosing = false;
         internal string currentPassword = "";
         internal bool langChanged = false;
         internal bool isLoading = false;
-        internal System.Windows.Forms.Timer autoSaveTimer;
-        internal System.Windows.Forms.Timer saveStatusTimer;
-        internal Label lblSaveStatus;
+        private bool wasInSchedule = false;
 
         internal string currentLanUrl = "";
         internal string currentLocalUrl = "";
         internal string currentLanLowUrl = "";
         internal string currentWebUrl = "";
 
-        internal Button btnCopyLan;
-        internal Button btnCopyLocal;
-        internal Button btnCopyWeb;
-
-        internal ComboBox cmbEncoder;
-        internal ComboBox cmbQuality;
-        internal ComboBox cmbMonitor;
-        internal ComboBox cmbFps;
-        internal RichTextBox rtbLogs;
-        
-        // Web Server
-        internal CheckBox chkWebServer;
-        internal TextBox txtWebPort;
         internal HttpListener httpListener;
         internal Thread webServerThread;
         internal bool isWebServerRunning = false;
@@ -75,140 +52,661 @@ namespace ScreenToRTSP
         internal MediaServer mediaServer;
         internal ConfigManager configManager;
 
+        private AppWindow _appWindow;
+        private IntPtr _hwnd;
+        private string pendingUpdateUrl = null;
+        private bool hasPendingBinUpdate = false;
+        private WinUITextBoxWriter _logWriter;
+
+        internal string ScheduleStartText
+        {
+            get => $"{tpScheduleStart.Time.Hours:D2}:{tpScheduleStart.Time.Minutes:D2}";
+            set
+            {
+                if (TimeSpan.TryParse(value, out var ts))
+                    tpScheduleStart.Time = ts;
+                else if (value != null && value.Length == 4 &&
+                         int.TryParse(value.Substring(0, 2), out int h) &&
+                         int.TryParse(value.Substring(2, 2), out int m))
+                    tpScheduleStart.Time = new TimeSpan(h, m, 0);
+            }
+        }
+
+        internal string ScheduleEndText
+        {
+            get => $"{tpScheduleEnd.Time.Hours:D2}:{tpScheduleEnd.Time.Minutes:D2}";
+            set
+            {
+                if (TimeSpan.TryParse(value, out var ts))
+                    tpScheduleEnd.Time = ts;
+                else if (value != null && value.Length == 4 &&
+                         int.TryParse(value.Substring(0, 2), out int h) &&
+                         int.TryParse(value.Substring(2, 2), out int m))
+                    tpScheduleEnd.Time = new TimeSpan(h, m, 0);
+            }
+        }
 
         public Main()
         {
-            InitializeComponent();
+            this.InitializeComponent();
+            InitializeAppWindow();
+
             configManager = new ConfigManager();
             var cfg = configManager.Load();
             string lang = cfg.ContainsKey("Language") ? cfg["Language"] : "System";
-            ScreenToRTSP.I18n.LanguageManager.ApplyLanguage(lang);
-            
+            LanguageManager.ApplyLanguage(lang);
+
             webPanel = new WebPanel(this);
             mediaServer = new MediaServer();
-            ScreenToRTSP.UI.UIManager.Build(this);
+
+            SetupControls();
+            SetupTrayIcon();
+            SetupTimers();
+
             LoadSettings();
-                        CheckStartupRegistry();
+            CheckStartupRegistry();
+            AttachAutoSaveHandlers();
 
-            System.Windows.Forms.Timer updateTimer = new System.Windows.Forms.Timer();
-            updateTimer.Interval = (int)TimeSpan.FromHours(24).TotalMilliseconds; // Checa a cada 24 horas
-            updateTimer.Tick += async (s, e) => {
-                await RunBackgroundUpdateCheck();
-            };
-            updateTimer.Start();
-            
-            trayIcon.BalloonTipClicked += async (s, e) => {
-                if (!string.IsNullOrEmpty(pendingUpdateUrl)) {
-                    await Core.Updater.PerformUpdate(pendingUpdateUrl, isTransmitting);
-                }
-                else if (hasPendingBinUpdate) {
-                    bool wasTransmitting = isTransmitting;
-                    if (wasTransmitting) StopClick();
-                    Core.DependencyManager.CheckAndDownloadDependencies(true);
-                    if (wasTransmitting) StartClick();
-                    hasPendingBinUpdate = false;
-                }
-            };
-            
-            _ = RunBackgroundUpdateCheck();
+            _logWriter = new WinUITextBoxWriter(rtbLogs, DispatcherQueue, maxLines: 300);
+            Console.SetOut(_logWriter);
+            Console.WriteLine("--- " + LanguageManager.Get("AppTitle") + " Logs ---");
 
-            autoSaveTimer = new System.Windows.Forms.Timer();
-            autoSaveTimer.Interval = 500;
-            autoSaveTimer.Tick += async (s, e) => {
-                autoSaveTimer.Stop();
-                if (!isLoading) {
-                    SaveSettings();
-                    if (lblSaveStatus != null) {
-                        lblSaveStatus.Text = "✔ " + ScreenToRTSP.I18n.LanguageManager.Get("MsgSaved");
-                        saveStatusTimer.Stop();
-                        saveStatusTimer.Start();
-                    }
-                    if (isTransmitting) {
-                        StopClick();
-                        await System.Threading.Tasks.Task.Delay(500);
-                        StartClick();
-                    }
-                }
-            };
-            AttachAutoSave(this);
-
-            saveStatusTimer = new System.Windows.Forms.Timer { Interval = 2000 };
-            saveStatusTimer.Tick += (s, e) => {
-                saveStatusTimer.Stop();
-                if (lblSaveStatus != null) lblSaveStatus.Visible = false;
-            };
-
-            if (chkWebServer.Checked) webPanel.Start();
+            if (chkWebServer.IsOn) webPanel.Start();
             UpdateUrlStatus();
+
+            _ = RunBackgroundUpdateCheck();
         }
 
-        protected override void Dispose(bool disposing)
+        private void InitializeAppWindow()
         {
-            if (disposing)
-            {
-                webPanel?.Stop();
-                trayIcon?.Dispose();
-                
-                
-                watchdogTimer?.Dispose();
-            }
-            base.Dispose(disposing);
-        }
-
-        [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
-        private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
-
-        protected override void OnHandleCreated(EventArgs e)
-        {
-            base.OnHandleCreated(e);
             try
             {
-                int useImmersiveDarkMode = 1;
-                DwmSetWindowAttribute(this.Handle, 20, ref useImmersiveDarkMode, sizeof(int));
-                DwmSetWindowAttribute(this.Handle, 19, ref useImmersiveDarkMode, sizeof(int));
+                _hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                Microsoft.UI.WindowId windowId = Win32Interop.GetWindowIdFromWindow(_hwnd);
+                _appWindow = AppWindow.GetFromWindowId(windowId);
+
+                const int winWidth = 1060;
+                const int winHeight = 800;
+                _appWindow.Resize(new SizeInt32(winWidth, winHeight));
+
+                if (_appWindow.Presenter is OverlappedPresenter presenter)
+                {
+                    presenter.IsMaximizable = false;
+                    presenter.IsResizable = false;
+                }
+
+                string icoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", "icon.ico");
+                if (File.Exists(icoPath))
+                {
+                    _appWindow.SetIcon(icoPath);
+                }
+
+                var displayArea = DisplayArea.GetFromWindowId(windowId, DisplayAreaFallback.Primary);
+                if (displayArea != null)
+                {
+                    int x = (displayArea.WorkArea.Width - winWidth) / 2;
+                    int y = (displayArea.WorkArea.Height - winHeight) / 2;
+                    _appWindow.Move(new PointInt32(Math.Max(0, x), Math.Max(0, y)));
+                }
+
+                this.ExtendsContentIntoTitleBar = true;
+                this.SetTitleBar(AppTitleBar);
+
+                if (AppWindowTitleBar.IsCustomizationSupported())
+                {
+                    var titleBar = _appWindow.TitleBar;
+                    titleBar.ButtonBackgroundColor = Colors.Transparent;
+                    titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
+                }
+
+                _appWindow.Closing += AppWindow_Closing;
+                _appWindow.Changed += AppWindow_Changed;
             }
             catch { }
         }
 
-        private void InitializeComponent()
+        private void SetupControls()
         {
-            this.SuspendLayout();
-            this.ClientSize = new System.Drawing.Size(800, 800);
-            this.Name = "Main";
-            this.Text = "Screen to RTSP";
-            try { this.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.FormBorderStyle = FormBorderStyle.FixedSingle;
-            this.MaximizeBox = false;
-            this.FormClosing += Form1_FormClosing;
-            this.Resize += Form1_Resize;
-            this.BackColor = Color.FromArgb(15, 23, 42); // Will be overridden by UIManager.Build
-            this.ResumeLayout(false);
+            cmbFps.Items.Clear();
+            foreach (var fps in new[] { "10", "12", "15", "20", "24", "30" })
+                cmbFps.Items.Add(fps);
+            cmbFps.SelectedIndex = 3;
 
-            watchdogTimer = new System.Windows.Forms.Timer();
-            watchdogTimer.Interval = 5000; // 5s for schedule check
-            watchdogTimer.Tick += WatchdogTimer_Tick;
+            UpdateUITexts();
+
+            LanguageManager.OnLanguageChanged += () =>
+            {
+                InvokeSafe(() =>
+                {
+                    UpdateUITexts();
+                    UpdateStartStopVisuals();
+                });
+            };
+
+            chkAuth.Toggled += (s, e) =>
+            {
+                txtUsername.IsEnabled = chkAuth.IsOn;
+                txtPassword.IsEnabled = chkAuth.IsOn;
+                TriggerAutoSave();
+            };
+
+            chkStartWithWindows.Toggled += (s, e) =>
+            {
+                if (!isLoading) ToggleStartWithWindows();
+                TriggerAutoSave();
+            };
+
+            chkSchedule.Toggled += (s, e) =>
+            {
+                if (chkSchedule.IsOn) watchdogTimer.Start();
+                else if (!isTransmitting) watchdogTimer.Stop();
+                TriggerAutoSave();
+            };
+
+            cmbLanguage.SelectionChanged += (s, e) =>
+            {
+                if (isLoading) return;
+                var keys = LanguageManager.GetLanguageKeys();
+                if (cmbLanguage.SelectedIndex >= 0 && cmbLanguage.SelectedIndex < keys.Count)
+                {
+                    var selectedKey = keys[cmbLanguage.SelectedIndex];
+                    if (selectedKey != LanguageManager.CurrentLangCode)
+                    {
+                        LanguageManager.ApplyLanguage(selectedKey);
+                    }
+                    TriggerAutoSave();
+                }
+            };
+
+            cmbTheme.SelectionChanged += (s, e) =>
+            {
+                if (isLoading || cmbTheme.SelectedIndex < 0) return;
+                string newTheme = cmbTheme.SelectedIndex == 1 ? "Dark" : (cmbTheme.SelectedIndex == 2 ? "Light" : "System");
+                ApplyTheme(newTheme);
+                SaveSettings();
+            };
+
+            chkWebServer.Toggled += (s, e) =>
+            {
+                if (isLoading) return;
+                if (chkWebServer.IsOn) webPanel.Start();
+                else webPanel.Stop();
+                UpdateUrlStatus();
+                TriggerAutoSave();
+            };
+
+            btnCopyWeb.Click += (s, e) =>
+            {
+                if (!string.IsNullOrEmpty(currentWebUrl))
+                {
+                    Process.Start(new ProcessStartInfo(currentWebUrl) { UseShellExecute = true });
+                }
+            };
+
+            btnCopyLan.Click += (s, e) => CopyToClipboard(currentLanUrl);
+            btnCopyLocal.Click += (s, e) => CopyToClipboard(currentLanLowUrl);
+
+            btnStart.Click += (s, e) =>
+            {
+                if (isTransmitting) StopClick();
+                else StartClick();
+            };
+
+            btnCheckUpdates.Click += BtnCheckUpdates_Click;
+            btnUpdateBinaries.Click += BtnUpdateBinaries_Click;
         }
 
-        private bool wasInSchedule = false;
-
-                public Core.StreamConfig GetStreamConfig()
+        private void CopyToClipboard(string text)
         {
-            var config = new Core.StreamConfig();
-            config.AppDataPath = AppDataPath;
-            config.Port = txtPort.Text;
-            config.UseAuth = chkAuth.Checked;
-            config.Username = txtUsername.Text;
-            config.Password = txtPassword.Text;
-            config.StreamName = txtStreamName.Text;
-            config.DualStream = chkDualStream.Checked;
-            config.QualityIndex = cmbQuality.SelectedIndex;
-            config.Fps = cmbFps.Text;
-            config.EncoderIndex = cmbEncoder.SelectedIndex;
-            config.ShowCursor = chkMouseCursor.Checked;
-            config.MonitorIndex = cmbMonitor.SelectedIndex;
-            if (config.MonitorIndex > 0 && config.MonitorIndex - 1 < Screen.AllScreens.Length)
-                config.MonitorBounds = Screen.AllScreens[config.MonitorIndex - 1].Bounds;
+            if (string.IsNullOrEmpty(text)) return;
+            try
+            {
+                var pkg = new DataPackage();
+                pkg.SetText(text);
+                Clipboard.SetContent(pkg);
+            }
+            catch { }
+        }
+
+        internal void ApplyTheme(string themeStr)
+        {
+            ElementTheme targetTheme = ElementTheme.Default;
+            if (themeStr == "Dark") targetTheme = ElementTheme.Dark;
+            else if (themeStr == "Light") targetTheme = ElementTheme.Light;
+
+            RootGrid.RequestedTheme = targetTheme;
+
+            try
+            {
+                if (_appWindow != null && AppWindowTitleBar.IsCustomizationSupported())
+                {
+                    bool isDark = targetTheme == ElementTheme.Dark ||
+                                  (targetTheme == ElementTheme.Default && Application.Current.RequestedTheme == ApplicationTheme.Dark);
+                    _appWindow.TitleBar.ButtonForegroundColor = isDark ? Colors.White : Colors.Black;
+                }
+            }
+            catch { }
+        }
+
+        internal void UpdateUITexts()
+        {
+            bool prevLoading = isLoading;
+            isLoading = true;
+            try
+            {
+                LblAppTitle.Text = LanguageManager.Get("AppTitle");
+                LblAppSubtitle.Text = LanguageManager.Get("AppSubtitle");
+
+                NavVideo.Content = LanguageManager.Get("TabVideo");
+                NavNetwork.Content = LanguageManager.Get("TabNetwork");
+                NavAutomation.Content = LanguageManager.Get("TabAutomation");
+                NavConfig.Content = LanguageManager.Get("TabConfig");
+                NavAbout.Content = LanguageManager.Get("TabAbout");
+
+                HeaderVideo.Text = LanguageManager.Get("TabVideo");
+                HeaderNetwork.Text = LanguageManager.Get("TabNetwork");
+                HeaderAutomation.Text = LanguageManager.Get("TabAutomation");
+                HeaderConfig.Text = LanguageManager.Get("TabConfig");
+                HeaderAbout.Text = LanguageManager.Get("TabAbout");
+
+                // Video Cards
+                CardMonitor.Header = LanguageManager.Get("MonitorLabel").TrimEnd(':');
+                CardMonitor.Description = LanguageManager.Get("TipMonitor");
+
+                int monSel = cmbMonitor.SelectedIndex;
+                cmbMonitor.Items.Clear();
+                cmbMonitor.Items.Add(LanguageManager.Get("AllMonitors"));
+                var monitors = MonitorHelper.GetMonitors();
+                for (int i = 0; i < monitors.Count; i++)
+                {
+                    cmbMonitor.Items.Add($"{LanguageManager.Get("MonitorPrefix")} {i + 1} ({monitors[i].Width}x{monitors[i].Height})");
+                }
+                cmbMonitor.SelectedIndex = (monSel >= 0 && monSel < cmbMonitor.Items.Count) ? monSel : 0;
+
+                CardEncoder.Header = LanguageManager.Get("EncoderLabel").TrimEnd(':');
+                CardEncoder.Description = LanguageManager.Get("TipEncoder");
+                int encSel = cmbEncoder.SelectedIndex;
+                cmbEncoder.Items.Clear();
+                cmbEncoder.Items.Add(LanguageManager.Get("EncoderCPU"));
+                cmbEncoder.Items.Add(LanguageManager.Get("EncoderNVENC"));
+                cmbEncoder.Items.Add(LanguageManager.Get("EncoderQSV"));
+                cmbEncoder.SelectedIndex = (encSel >= 0 && encSel < cmbEncoder.Items.Count) ? encSel : 0;
+
+                CardQuality.Header = LanguageManager.Get("QualityLabel").TrimEnd(':');
+                CardQuality.Description = LanguageManager.Get("TipQuality");
+                int qSel = cmbQuality.SelectedIndex;
+                cmbQuality.Items.Clear();
+                cmbQuality.Items.Add(LanguageManager.Get("QualityLow"));
+                cmbQuality.Items.Add(LanguageManager.Get("QualityMedium"));
+                cmbQuality.Items.Add(LanguageManager.Get("QualityHigh"));
+                cmbQuality.SelectedIndex = (qSel >= 0 && qSel < cmbQuality.Items.Count) ? qSel : 1;
+
+                CardFps.Header = LanguageManager.Get("FpsLabel").TrimEnd(':');
+                CardFps.Description = LanguageManager.Get("TipFps");
+
+                CardDualStream.Header = LanguageManager.Get("DualStreamLabel");
+                CardDualStream.Description = LanguageManager.Get("TipDualStream");
+
+                CardMouseCursor.Header = LanguageManager.Get("MouseCursorLabel");
+                CardMouseCursor.Description = LanguageManager.Get("TipMouseCursor");
+
+                // Network Cards
+                CardStreamName.Header = LanguageManager.Get("StreamNameLabel").TrimEnd(':');
+                CardPort.Header = LanguageManager.Get("PortLabel").TrimEnd(':');
+                ExpanderAuth.Header = LanguageManager.Get("AuthLabel");
+                CardUsername.Header = LanguageManager.Get("UserLabel").TrimEnd(':');
+                CardPassword.Header = LanguageManager.Get("PasswordLabel").TrimEnd(':');
+                txtPassword.PlaceholderText = !string.IsNullOrEmpty(currentPassword) ? LanguageManager.Get("PassPlaceholder") : "";
+
+                // Automation Cards
+                CardStartWindows.Header = LanguageManager.Get("StartWindowsLabel");
+                CardStartWindows.Description = LanguageManager.Get("TipStartWindows");
+                ExpanderSchedule.Header = LanguageManager.Get("ScheduleLabel").TrimEnd(':');
+                ExpanderSchedule.Description = LanguageManager.Get("TipSchedule");
+                CardScheduleStart.Header = LanguageManager.Get("ScheduleStartLabel").TrimEnd(':');
+                CardScheduleEnd.Header = LanguageManager.Get("ScheduleEndLabel").TrimEnd(':');
+
+                // Config Cards
+                CardLanguage.Header = LanguageManager.Get("LanguageLabel").TrimEnd(':');
+                CardLanguage.Description = LanguageManager.Get("TipLanguage");
+                var langItems = LanguageManager.GetLanguageKeys();
+                int langSel = cmbLanguage.SelectedIndex;
+                cmbLanguage.Items.Clear();
+                foreach (var k in langItems)
+                {
+                    if (k == "System") cmbLanguage.Items.Add(LanguageManager.Get("LanguageSystem"));
+                    else if (k == "pt-BR") cmbLanguage.Items.Add("Português (Brasil)");
+                    else if (k == "en-US") cmbLanguage.Items.Add("English (US)");
+                    else if (k == "es-ES") cmbLanguage.Items.Add("Español (España)");
+                    else cmbLanguage.Items.Add(k);
+                }
+                if (langSel >= 0 && langSel < cmbLanguage.Items.Count)
+                    cmbLanguage.SelectedIndex = langSel;
+                else
+                {
+                    int idx = langItems.IndexOf(LanguageManager.CurrentLangCode);
+                    cmbLanguage.SelectedIndex = idx != -1 ? idx : 0;
+                }
+
+                CardTheme.Header = LanguageManager.Get("ThemeLabel").TrimEnd(':');
+                int themeSel = cmbTheme.SelectedIndex;
+                cmbTheme.Items.Clear();
+                cmbTheme.Items.Add(LanguageManager.Get("ThemeSystem"));
+                cmbTheme.Items.Add(LanguageManager.Get("ThemeDark"));
+                cmbTheme.Items.Add(LanguageManager.Get("ThemeLight"));
+                if (themeSel >= 0 && themeSel < cmbTheme.Items.Count)
+                    cmbTheme.SelectedIndex = themeSel;
+                else
+                    cmbTheme.SelectedIndex = 0;
+
+                ExpanderWebServer.Header = LanguageManager.Get("WebServerLabel");
+                ExpanderWebServer.Description = LanguageManager.Get("TipWebServer");
+                CardWebPort.Header = LanguageManager.Get("WebPortLabel").TrimEnd(':');
+                CardWebPort.Description = LanguageManager.Get("TipWebPort");
+                LblBtnOpenWeb.Text = LanguageManager.Get("BtnOpenWeb");
+
+                // About Cards
+                lblAboutTitle.Text = LanguageManager.Get("AppTitle");
+                lblAboutDesc.Text = LanguageManager.Get("AboutDesc");
+                CardAppVersion.Header = LanguageManager.Get("AppTitle");
+                RefreshAboutVersionLabels();
+
+                LblBtnCheckUpdates.Text = LanguageManager.Get("BtnCheckUpdates");
+                LblBtnUpdateBinaries.Text = LanguageManager.Get("BtnUpdateBinaries");
+                InfoBarUpdate.Title = LanguageManager.Get("UpdateAvailable");
+
+                // Bottom Bar
+                LblBtnCopyLan.Text = LanguageManager.Get("BtnCopyLan");
+                LblBtnCopyLocal.Text = LanguageManager.Get("BtnCopyLocal");
+                UpdateUrlStatus();
+                trayIcon?.SetTooltip(LanguageManager.Get("AppTitle"));
+            }
+            finally
+            {
+                isLoading = prevLoading;
+            }
+        }
+
+        private void RefreshAboutVersionLabels()
+        {
+            lblAboutVersion.Text = LanguageManager.Get("AboutVersion") + Updater.GetAppVersion();
+            lblAboutUpdate.Text = Updater.HasAppUpdate ? $"({LanguageManager.Get("NewVersion")}{Updater.LatestVersionStr})" : "";
+
+            lblFFmpegVersion.Text = LanguageManager.Get("AboutVersion") + DependencyManager.GetFFmpegVersion();
+            lblFFmpegUpdate.Text = DependencyManager.HasFfmpegUpdate ? $"({LanguageManager.Get("NewVersion")}{DependencyManager.FfmpegLatestVersionStr})" : "";
+
+            lblMediaMTXVersion.Text = LanguageManager.Get("AboutVersion") + DependencyManager.GetMediaMTXVersion();
+            lblMediaMTXUpdate.Text = DependencyManager.HasMtxUpdate ? $"({LanguageManager.Get("NewVersion")}{DependencyManager.MtxLatestVersionStr})" : "";
+        }
+
+        private void SetupTrayIcon()
+        {
+            trayIcon = new TrayIconService();
+            trayIcon.SetTooltip(LanguageManager.Get("AppTitle"));
+            trayIcon.IsTransmittingProvider = () => isTransmitting;
+            trayIcon.IsWebServerEnabledProvider = () => isWebServerRunning;
+            trayIcon.MenuLabelsProvider = () => (
+                "▶ " + LanguageManager.Get("BtnStart"),
+                "■ " + LanguageManager.Get("BtnStop"),
+                LanguageManager.Get("BtnOpenWeb"),
+                LanguageManager.Get("TrayConfig"),
+                LanguageManager.Get("TrayExit")
+            );
+
+            trayIcon.DoubleClicked += () => DispatcherQueue.TryEnqueue(ShowFormSafe);
+            trayIcon.OpenConfigRequested += () => DispatcherQueue.TryEnqueue(ShowFormSafe);
+            trayIcon.StartRequested += () => DispatcherQueue.TryEnqueue(StartClick);
+            trayIcon.StopRequested += () => DispatcherQueue.TryEnqueue(StopClick);
+            trayIcon.OpenWebRequested += () => DispatcherQueue.TryEnqueue(() =>
+            {
+                if (chkWebServer.IsOn)
+                {
+                    string port = string.IsNullOrEmpty(txtWebPort.Text) ? "8889" : txtWebPort.Text;
+                    Process.Start(new ProcessStartInfo($"http://localhost:{port}") { UseShellExecute = true });
+                }
+            });
+            trayIcon.ExitRequested += () => DispatcherQueue.TryEnqueue(() =>
+            {
+                isForceClosing = true;
+                trayIcon.Dispose();
+                mediaServer?.StopProcesses();
+                webPanel?.Stop();
+                Application.Current.Exit();
+            });
+            trayIcon.BalloonTipClicked += () => DispatcherQueue.TryEnqueue(async () =>
+            {
+                if (!string.IsNullOrEmpty(pendingUpdateUrl))
+                {
+                    await Updater.PerformUpdate(pendingUpdateUrl, isTransmitting);
+                }
+                else if (hasPendingBinUpdate)
+                {
+                    bool wasTransmitting = isTransmitting;
+                    if (wasTransmitting) StopClick();
+                    var dlWin = new DependencyDownloadWindow();
+                    await dlWin.RunDownloadAsync(true);
+                    if (wasTransmitting) StartClick();
+                    hasPendingBinUpdate = false;
+                }
+            });
+        }
+
+        private void SetupTimers()
+        {
+            watchdogTimer = DispatcherQueue.CreateTimer();
+            watchdogTimer.Interval = TimeSpan.FromSeconds(5);
+            watchdogTimer.Tick += WatchdogTimer_Tick;
+
+            var updateTimer = DispatcherQueue.CreateTimer();
+            updateTimer.Interval = TimeSpan.FromHours(24);
+            updateTimer.Tick += async (s, e) => await RunBackgroundUpdateCheck();
+            updateTimer.Start();
+
+            autoSaveTimer = DispatcherQueue.CreateTimer();
+            autoSaveTimer.Interval = TimeSpan.FromMilliseconds(500);
+            autoSaveTimer.Tick += async (s, e) =>
+            {
+                autoSaveTimer.Stop();
+                if (!isLoading)
+                {
+                    SaveSettings();
+                    lblSaveStatus.Text = "✔ " + LanguageManager.Get("MsgSaved");
+                    SaveStatusBadge.Visibility = Visibility.Visible;
+                    saveStatusTimer.Stop();
+                    saveStatusTimer.Start();
+
+                    if (isTransmitting)
+                    {
+                        StopClick();
+                        await Task.Delay(500);
+                        StartClick();
+                    }
+                }
+            };
+
+            saveStatusTimer = DispatcherQueue.CreateTimer();
+            saveStatusTimer.Interval = TimeSpan.FromSeconds(2);
+            saveStatusTimer.Tick += (s, e) =>
+            {
+                saveStatusTimer.Stop();
+                SaveStatusBadge.Visibility = Visibility.Collapsed;
+            };
+
+            portTypingTimer = DispatcherQueue.CreateTimer();
+            portTypingTimer.Interval = TimeSpan.FromSeconds(1);
+            portTypingTimer.Tick += (s, e) =>
+            {
+                portTypingTimer.Stop();
+                if (chkWebServer.IsOn)
+                {
+                    webPanel.Stop();
+                    webPanel.Start();
+                    UpdateUrlStatus();
+                }
+            };
+        }
+
+        private void AttachAutoSaveHandlers()
+        {
+            cmbMonitor.SelectionChanged += (s, e) => TriggerAutoSave();
+            cmbEncoder.SelectionChanged += (s, e) => TriggerAutoSave();
+            cmbQuality.SelectionChanged += (s, e) => TriggerAutoSave();
+            cmbFps.SelectionChanged += (s, e) => TriggerAutoSave();
+            chkDualStream.Toggled += (s, e) => { TriggerAutoSave(); UpdateUrlStatus(); };
+            chkMouseCursor.Toggled += (s, e) => TriggerAutoSave();
+
+            txtStreamName.TextChanged += (s, e) => { TriggerAutoSave(); UpdateUrlStatus(); };
+            txtPort.TextChanged += (s, e) => { TriggerAutoSave(); UpdateUrlStatus(); };
+            txtUsername.TextChanged += (s, e) => TriggerAutoSave();
+            txtPassword.PasswordChanged += (s, e) => TriggerAutoSave();
+
+            tpScheduleStart.TimeChanged += (s, e) => TriggerAutoSave();
+            tpScheduleEnd.TimeChanged += (s, e) => TriggerAutoSave();
+
+            txtWebPort.TextChanged += (s, e) =>
+            {
+                if (isLoading) return;
+                TriggerAutoSave();
+                portTypingTimer.Stop();
+                portTypingTimer.Start();
+            };
+        }
+
+        private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
+        {
+            if (args.SelectedItem is NavigationViewItem item && item.Tag is string tag)
+            {
+                PageVideo.Visibility = tag == "video" ? Visibility.Visible : Visibility.Collapsed;
+                PageNetwork.Visibility = tag == "network" ? Visibility.Visible : Visibility.Collapsed;
+                PageAutomation.Visibility = tag == "automation" ? Visibility.Visible : Visibility.Collapsed;
+                PageConfig.Visibility = tag == "config" ? Visibility.Visible : Visibility.Collapsed;
+                PageLogs.Visibility = tag == "logs" ? Visibility.Visible : Visibility.Collapsed;
+                PageAbout.Visibility = tag == "about" ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
+        private void BtnClearLogs_Click(object sender, RoutedEventArgs e)
+        {
+            _logWriter?.Clear();
+            rtbLogs.Text = "";
+        }
+
+        private async void BtnCheckUpdates_Click(object sender, RoutedEventArgs e)
+        {
+            btnCheckUpdates.IsEnabled = false;
+            PrgCheckUpdates.Visibility = Visibility.Visible;
+            PrgCheckUpdates.IsActive = true;
+
+            try
+            {
+                await Updater.CheckForUpdatesAsync();
+                bool hasUpdate = await DependencyManager.CheckForNewVersionsAsync(true);
+                RefreshAboutVersionLabels();
+
+                if (hasUpdate || Updater.HasAppUpdate)
+                {
+                    string msg = "";
+                    if (Updater.HasAppUpdate) msg += $"App ({Updater.LatestVersionStr}) ";
+                    if (DependencyManager.HasFfmpegUpdate) msg += $"FFmpeg ({DependencyManager.FfmpegLatestVersionStr}) ";
+                    if (DependencyManager.HasMtxUpdate) msg += $"MediaMTX ({DependencyManager.MtxLatestVersionStr})";
+
+                    InfoBarUpdate.Title = LanguageManager.Get("UpdateAvailable");
+                    InfoBarUpdate.Message = msg.Trim();
+                    InfoBarUpdate.Severity = InfoBarSeverity.Warning;
+                    InfoBarUpdate.IsOpen = true;
+                    btnUpdateBinaries.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    InfoBarUpdate.Title = LanguageManager.Get("MsgNoUpdate");
+                    InfoBarUpdate.Message = "";
+                    InfoBarUpdate.Severity = InfoBarSeverity.Success;
+                    InfoBarUpdate.IsOpen = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                InfoBarUpdate.Title = LanguageManager.Get("MsgCheckUpdateError");
+                InfoBarUpdate.Message = ex.Message;
+                InfoBarUpdate.Severity = InfoBarSeverity.Error;
+                InfoBarUpdate.IsOpen = true;
+            }
+            finally
+            {
+                PrgCheckUpdates.IsActive = false;
+                PrgCheckUpdates.Visibility = Visibility.Collapsed;
+                btnCheckUpdates.IsEnabled = true;
+            }
+        }
+
+        private async void BtnUpdateBinaries_Click(object sender, RoutedEventArgs e)
+        {
+            bool wasTransmitting = isTransmitting;
+            if (wasTransmitting)
+            {
+                if (!MonitorHelper.ShowConfirm(LanguageManager.Get("MsgStopBeforeUpdate"), "Atenção", _hwnd))
+                    return;
+                StopClick();
+            }
+
+            bool updatedDeps = false;
+            if (DependencyManager.HasFfmpegUpdate || DependencyManager.HasMtxUpdate)
+            {
+                var dlWin = new DependencyDownloadWindow();
+                if (await dlWin.RunDownloadAsync(true))
+                {
+                    await DependencyManager.CheckForNewVersionsAsync();
+                    updatedDeps = true;
+                }
+            }
+
+            if (Updater.HasAppUpdate)
+            {
+                await Updater.PerformUpdate(Updater.LatestDownloadUrl, wasTransmitting);
+                return;
+            }
+
+            RefreshAboutVersionLabels();
+            InfoBarUpdate.IsOpen = false;
+            btnUpdateBinaries.Visibility = Visibility.Collapsed;
+
+            if (updatedDeps)
+            {
+                InfoBarUpdate.Title = LanguageManager.Get("MsgUpdateSuccess");
+                InfoBarUpdate.Message = "";
+                InfoBarUpdate.Severity = InfoBarSeverity.Success;
+                InfoBarUpdate.IsOpen = true;
+            }
+
+            if (wasTransmitting)
+            {
+                StartClick();
+            }
+        }
+
+        public StreamConfig GetStreamConfig()
+        {
+            var config = new StreamConfig
+            {
+                AppDataPath = AppDataPath,
+                Port = txtPort.Text,
+                UseAuth = chkAuth.IsOn,
+                Username = txtUsername.Text,
+                Password = string.IsNullOrEmpty(txtPassword.Password) ? currentPassword : txtPassword.Password,
+                StreamName = txtStreamName.Text,
+                DualStream = chkDualStream.IsOn,
+                QualityIndex = cmbQuality.SelectedIndex,
+                Fps = cmbFps.SelectedItem?.ToString() ?? "20",
+                EncoderIndex = cmbEncoder.SelectedIndex,
+                ShowCursor = chkMouseCursor.IsOn,
+                MonitorIndex = cmbMonitor.SelectedIndex
+            };
+
+            var monitors = MonitorHelper.GetMonitors();
+            if (config.MonitorIndex > 0 && config.MonitorIndex - 1 < monitors.Count)
+            {
+                config.MonitorBounds = monitors[config.MonitorIndex - 1];
+            }
             return config;
         }
 
@@ -218,36 +716,27 @@ namespace ScreenToRTSP
             try
             {
                 var cfg = configManager.Load();
-                
                 string Get(string key, string def) => cfg.ContainsKey(key) ? cfg[key] : def;
-                
+
                 txtStreamName.Text = Get("StreamName", "camera1");
                 txtPort.Text = Get("Port", "8554");
-                chkAuth.Checked = Convert.ToBoolean(Get("UseAuth", "False"));
-                chkDualStream.Checked = Convert.ToBoolean(Get("UseDual", "True"));
-                chkMouseCursor.Checked = Convert.ToBoolean(Get("MouseCursor", "True"));
-                chkWebServer.Checked = Convert.ToBoolean(Get("WebServer", "False"));
+                chkAuth.IsOn = Convert.ToBoolean(Get("UseAuth", "False"));
+                chkDualStream.IsOn = Convert.ToBoolean(Get("UseDual", "True"));
+                chkMouseCursor.IsOn = Convert.ToBoolean(Get("MouseCursor", "True"));
+                chkWebServer.IsOn = Convert.ToBoolean(Get("WebServer", "False"));
                 txtWebPort.Text = Get("WebPort", "8889");
-                
-                chkSchedule.Checked = Convert.ToBoolean(Get("UseSchedule", "False"));
-                chkSchedule.CheckedChanged += (s, e) => {
-                    if (chkSchedule.Checked) watchdogTimer.Start();
-                    else if (!isTransmitting) watchdogTimer.Stop();
-                };
-                if (chkSchedule.Checked) watchdogTimer.Start();
-                
-                txtScheduleStart.Text = Get("ScheduleStart", "05:45");
-                txtScheduleEnd.Text = Get("ScheduleEnd", "22:15");
+
+                chkSchedule.IsOn = Convert.ToBoolean(Get("UseSchedule", "False"));
+                if (chkSchedule.IsOn) watchdogTimer.Start();
+
+                ScheduleStartText = Get("ScheduleStart", "05:45");
+                ScheduleEndText = Get("ScheduleEnd", "22:15");
 
                 txtUsername.Text = Get("Username", "admin");
                 currentPassword = configManager.DecryptPassword(Get("Password", ""));
-                txtPassword.Text = "";
-                if (!string.IsNullOrEmpty(currentPassword)) {
-                    txtPassword.PlaceholderText = LanguageManager.Get("PassPlaceholder");
-                } else {
-                    txtPassword.PlaceholderText = "";
-                }
-                
+                txtPassword.Password = "";
+                txtPassword.PlaceholderText = !string.IsNullOrEmpty(currentPassword) ? LanguageManager.Get("PassPlaceholder") : "";
+
                 int encIdx = Convert.ToInt32(Get("EncoderIdx", "0"));
                 if (encIdx >= 0 && encIdx < cmbEncoder.Items.Count) cmbEncoder.SelectedIndex = encIdx;
 
@@ -259,8 +748,7 @@ namespace ScreenToRTSP
 
                 string fpsVal = Get("FPS", "12");
                 int fpsIdx = cmbFps.Items.IndexOf(fpsVal);
-                if (fpsIdx >= 0) cmbFps.SelectedIndex = fpsIdx;
-                else cmbFps.SelectedIndex = 1;
+                cmbFps.SelectedIndex = fpsIdx >= 0 ? fpsIdx : 1;
 
                 string langVal = Get("Language", "System");
                 int langIdx = 0;
@@ -268,69 +756,64 @@ namespace ScreenToRTSP
                 else if (langVal == "es-ES") langIdx = 2;
                 else if (langVal == "en-US") langIdx = 3;
                 if (langIdx >= 0 && langIdx < cmbLanguage.Items.Count) cmbLanguage.SelectedIndex = langIdx;
+
+                string themeVal = Get("Theme", "System");
+                int themeIdx = themeVal == "Dark" ? 1 : (themeVal == "Light" ? 2 : 0);
+                if (themeIdx >= 0 && themeIdx < cmbTheme.Items.Count) cmbTheme.SelectedIndex = themeIdx;
+                ApplyTheme(themeVal);
             }
             catch { }
-            txtUsername.Enabled = chkAuth.Checked;
-            txtPassword.Enabled = chkAuth.Checked;
+
+            txtUsername.IsEnabled = chkAuth.IsOn;
+            txtPassword.IsEnabled = chkAuth.IsOn;
             isLoading = false;
         }
 
         internal void TriggerAutoSave()
         {
             if (isLoading || autoSaveTimer == null) return;
-            if (lblSaveStatus != null) {
-                lblSaveStatus.Text = ScreenToRTSP.I18n.LanguageManager.Get("MsgSaving");
-                lblSaveStatus.Visible = true;
-            }
+            lblSaveStatus.Text = LanguageManager.Get("MsgSaving");
+            SaveStatusBadge.Visibility = Visibility.Visible;
             autoSaveTimer.Stop();
             autoSaveTimer.Start();
-        }
-
-        public void AttachAutoSave(Control parent)
-        {
-            foreach (Control c in parent.Controls)
-            {
-                if (c is TextBox txt) txt.TextChanged += (s, e) => TriggerAutoSave();
-                else if (c is MaskedTextBox mtxt) mtxt.TextChanged += (s, e) => TriggerAutoSave();
-                else if (c is CheckBox chk) chk.CheckedChanged += (s, e) => TriggerAutoSave();
-                else if (c is ComboBox cmb) cmb.SelectedIndexChanged += (s, e) => TriggerAutoSave();
-                
-                if (c.HasChildren) AttachAutoSave(c);
-            }
         }
 
         public void SaveSettings()
         {
             try
             {
-                var lines = new System.Collections.Generic.List<string>();
+                var lines = new List<string>();
                 lines.Add("StreamName=" + txtStreamName.Text);
                 lines.Add("Port=" + txtPort.Text);
-                lines.Add("UseAuth=" + chkAuth.Checked.ToString());
-                lines.Add("UseDual=" + chkDualStream.Checked.ToString());
-                lines.Add("MouseCursor=" + chkMouseCursor.Checked.ToString());
-                lines.Add("WebServer=" + chkWebServer.Checked.ToString());
+                lines.Add("UseAuth=" + chkAuth.IsOn.ToString());
+                lines.Add("UseDual=" + chkDualStream.IsOn.ToString());
+                lines.Add("MouseCursor=" + chkMouseCursor.IsOn.ToString());
+                lines.Add("WebServer=" + chkWebServer.IsOn.ToString());
                 lines.Add("WebPort=" + txtWebPort.Text);
-                lines.Add("UseSchedule=" + chkSchedule.Checked.ToString());
-                lines.Add("ScheduleStart=" + txtScheduleStart.Text);
-                lines.Add("ScheduleEnd=" + txtScheduleEnd.Text);
+                lines.Add("UseSchedule=" + chkSchedule.IsOn.ToString());
+                lines.Add("ScheduleStart=" + ScheduleStartText);
+                lines.Add("ScheduleEnd=" + ScheduleEndText);
                 lines.Add("Username=" + txtUsername.Text);
-                string passToSave = string.IsNullOrEmpty(txtPassword.Text) ? currentPassword : txtPassword.Text;
+
+                string passToSave = string.IsNullOrEmpty(txtPassword.Password) ? currentPassword : txtPassword.Password;
                 currentPassword = passToSave;
                 lines.Add("Password=" + configManager.EncryptPassword(passToSave));
                 lines.Add("EncoderIdx=" + cmbEncoder.SelectedIndex);
                 lines.Add("QualityIdx=" + cmbQuality.SelectedIndex);
                 lines.Add("MonitorIdx=" + cmbMonitor.SelectedIndex);
-                lines.Add("FPS=" + cmbFps.SelectedItem.ToString());
-                
+                lines.Add("FPS=" + (cmbFps.SelectedItem?.ToString() ?? "20"));
+
                 string[] langKeys = { "System", "pt-BR", "es-ES", "en-US" };
-                string newLang = langKeys[cmbLanguage.SelectedIndex];
+                int lIdx = Math.Clamp(cmbLanguage.SelectedIndex, 0, langKeys.Length - 1);
+                string newLang = langKeys[lIdx];
                 var oldCfg = configManager.Load();
                 string oldLang = oldCfg.ContainsKey("Language") ? oldCfg["Language"] : "System";
                 if (newLang != oldLang) langChanged = true;
                 lines.Add("Language=" + newLang);
-                if (oldCfg.ContainsKey("Theme")) lines.Add("Theme=" + oldCfg["Theme"]);
-                
+
+                string themeStr = cmbTheme.SelectedIndex == 1 ? "Dark" : (cmbTheme.SelectedIndex == 2 ? "Light" : "System");
+                lines.Add("Theme=" + themeStr);
+
                 configManager.Save(lines);
             }
             catch { }
@@ -338,151 +821,202 @@ namespace ScreenToRTSP
 
         private void CheckStartupRegistry()
         {
-            bool isFirstRun = configManager.IsFirstRun();
-
-            RegistryKey rk = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
-            
-            if (isFirstRun) 
+            isLoading = true;
+            try
             {
-                chkStartWithWindows.Checked = true;
+                bool isFirstRun = configManager.IsFirstRun();
+                using RegistryKey rk = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
+                if (isFirstRun)
+                {
+                    chkStartWithWindows.IsOn = true;
+                    ToggleStartWithWindows();
+                }
+                else if (rk != null)
+                {
+                    chkStartWithWindows.IsOn = rk.GetValue("ScreenToRTSP") != null;
+                }
             }
-            else
-            {
-                chkStartWithWindows.Checked = rk.GetValue("ScreenToRTSP") != null;
-            }
+            catch { }
+            isLoading = false;
         }
 
         internal void ToggleStartWithWindows()
         {
-            RegistryKey rk = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
-            if (chkStartWithWindows.Checked) rk.SetValue("ScreenToRTSP", Application.ExecutablePath + " --minimized");
-            else rk.DeleteValue("ScreenToRTSP", false);
+            try
+            {
+                using RegistryKey rk = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
+                if (rk == null) return;
+                string exePath = Environment.ProcessPath ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ScreenToRTSP.exe");
+                if (chkStartWithWindows.IsOn)
+                    rk.SetValue("ScreenToRTSP", $"\"{exePath}\" --minimized");
+                else
+                    rk.DeleteValue("ScreenToRTSP", false);
+            }
+            catch { }
         }
 
-
-
-        // Os métodos MediaMtx e FFmpeg foram movidos para Core.MediaServer
+        private void UpdateStartStopVisuals()
+        {
+            if (isTransmitting)
+            {
+                IconBtnStart.Glyph = "\uE71A"; // Stop symbol
+                LblBtnStart.Text = LanguageManager.Get("BtnStop");
+                lblStatus.Text = $"{LanguageManager.Get("StatusPrefix")}{LanguageManager.Get("StatusRunning")}";
+                StatusDot.Fill = new SolidColorBrush(Color.FromArgb(255, 34, 197, 94));
+            }
+            else
+            {
+                IconBtnStart.Glyph = "\uE768"; // Play symbol
+                LblBtnStart.Text = LanguageManager.Get("BtnStart");
+                lblStatus.Text = $"{LanguageManager.Get("StatusPrefix")}{LanguageManager.Get("StatusStopped")}";
+                StatusDot.Fill = new SolidColorBrush(Color.FromArgb(255, 225, 29, 72));
+            }
+        }
 
         private void BtnStart_Click(object sender, EventArgs e)
         {
             try
             {
                 if (isTransmitting) return;
-                
-                bool calledBySchedule = (sender == watchdogTimer);
-                
-                string actualPassForCheck = string.IsNullOrEmpty(txtPassword.Text) ? currentPassword : txtPassword.Text;
-                if (chkAuth.Checked && (string.IsNullOrEmpty(txtUsername.Text) || string.IsNullOrEmpty(actualPassForCheck))) {
-                    chkAuth.Checked = false;
+
+                string actualPassForCheck = string.IsNullOrEmpty(txtPassword.Password) ? currentPassword : txtPassword.Password;
+                if (chkAuth.IsOn && (string.IsNullOrEmpty(txtUsername.Text) || string.IsNullOrEmpty(actualPassForCheck)))
+                {
+                    isLoading = true;
+                    chkAuth.IsOn = false;
+                    isLoading = false;
                 }
-                
+
                 SaveSettings();
                 var config = GetStreamConfig();
                 mediaServer.GenerateMediaMtxConfig(config);
-
                 mediaServer.LaunchMediaMtx(config);
                 mediaServer.LaunchFFmpeg(config);
 
                 isTransmitting = true;
                 watchdogTimer.Start();
 
-                btnStart.Text = "■ " + LanguageManager.Get("BtnStop");
-                btnStart.BackColor = Color.FromArgb(226, 232, 240);
-                btnStart.ForeColor = Color.FromArgb(51, 65, 85);
-                lblStatus.Text = $"● {LanguageManager.Get("StatusPrefix")}{LanguageManager.Get("StatusRunning")}";
-                lblStatus.ForeColor = Color.MediumSeaGreen;
-
+                UpdateStartStopVisuals();
                 UpdateUrlStatus();
-                trayIcon.Visible = true;
-                trayIcon.Visible = true;
+                if (trayIcon != null) trayIcon.Visible = true;
             }
-            catch (Exception ex) { MessageBox.Show("Erro ao iniciar: " + ex.Message, "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error); mediaServer.StopProcesses(); }
-        }
-
-        private void WatchdogTimer_Tick(object sender, EventArgs e)
-        {
-            // Check Schedule
-            if (chkSchedule.Checked)
+            catch (Exception ex)
             {
-                if (TimeSpan.TryParse(txtScheduleStart.Text, out TimeSpan start) && TimeSpan.TryParse(txtScheduleEnd.Text, out TimeSpan end))
-                {
-                    TimeSpan now = DateTime.Now.TimeOfDay;
-                    bool inSchedule = false;
-                    if (start <= end) inSchedule = (now >= start && now <= end);
-                    else inSchedule = (now >= start || now <= end);
-
-                    if (inSchedule && !wasInSchedule) 
-                    {
-                        if (!isTransmitting) BtnStart_Click(watchdogTimer, null);
-                    }
-                    else if (!inSchedule && wasInSchedule) 
-                    {
-                        if (isTransmitting) BtnStop_Click(watchdogTimer, null);
-                    }
-                    
-                    wasInSchedule = inSchedule;
-                }
-            }
-            else
-            {
-                wasInSchedule = false;
-            }
-
-            // Watchdog
-            if (!isTransmitting) return;
-            bool ffmpegDied = !mediaServer.IsFfmpegRunning;
-            bool mtxDied = !mediaServer.IsMediaMtxRunning;
-            if (ffmpegDied || mtxDied)
-            {
-                try { var cfg = GetStreamConfig(); if (mtxDied) mediaServer.LaunchMediaMtx(cfg); if (ffmpegDied) mediaServer.LaunchFFmpeg(cfg); } catch { }
+                MonitorHelper.ShowMessage("Erro ao iniciar: " + ex.Message, "Erro", MonitorHelper.MB_ICONERROR, _hwnd);
+                mediaServer.StopProcesses();
             }
         }
 
         private void BtnStop_Click(object sender, EventArgs e)
         {
             isTransmitting = false;
-            
-            bool calledBySchedule = (sender == watchdogTimer);
+
+            bool calledBySchedule = ReferenceEquals(sender, watchdogTimer);
             if (!calledBySchedule)
             {
-                if (!chkSchedule.Checked) watchdogTimer.Stop();
+                if (!chkSchedule.IsOn) watchdogTimer.Stop();
                 SaveSettings();
             }
-            
+
             mediaServer.StopProcesses();
-            btnStart.Text = "▶ " + LanguageManager.Get("BtnStart");
-            btnStart.BackColor = Color.FromArgb(22, 163, 74);
-            btnStart.ForeColor = Color.White;
-            lblStatus.Text = $"● {LanguageManager.Get("StatusPrefix")}{LanguageManager.Get("StatusStopped")}";
-            lblStatus.ForeColor = Color.Crimson;
+            UpdateStartStopVisuals();
             UpdateUrlStatus();
         }
 
-        private void Form1_FormClosing(object sender, FormClosingEventArgs e) 
-        { 
-            if (isTransmitting && !isForceClosing && e.CloseReason == CloseReason.UserClosing)
+        private void WatchdogTimer_Tick(DispatcherQueueTimer sender, object args)
+        {
+            if (chkSchedule.IsOn)
             {
-                e.Cancel = true;
+                TimeSpan start = tpScheduleStart.Time;
+                TimeSpan end = tpScheduleEnd.Time;
+                TimeSpan now = DateTime.Now.TimeOfDay;
+                bool inSchedule = (start <= end) ? (now >= start && now <= end) : (now >= start || now <= end);
+
+                if (inSchedule && !wasInSchedule)
+                {
+                    if (!isTransmitting) BtnStart_Click(watchdogTimer, null);
+                }
+                else if (!inSchedule && wasInSchedule)
+                {
+                    if (isTransmitting) BtnStop_Click(watchdogTimer, null);
+                }
+
+                wasInSchedule = inSchedule;
+            }
+            else
+            {
+                wasInSchedule = false;
+            }
+
+            if (!isTransmitting) return;
+            bool ffmpegDied = !mediaServer.IsFfmpegRunning;
+            bool mtxDied = !mediaServer.IsMediaMtxRunning;
+            if (ffmpegDied || mtxDied)
+            {
+                try
+                {
+                    var cfg = GetStreamConfig();
+                    if (mtxDied) mediaServer.LaunchMediaMtx(cfg);
+                    if (ffmpegDied) mediaServer.LaunchFFmpeg(cfg);
+                }
+                catch { }
+            }
+        }
+
+        private void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
+        {
+            if (isTransmitting && !isForceClosing)
+            {
+                args.Cancel = true;
                 HideForm();
                 return;
             }
             SaveSettings();
-            mediaServer.StopProcesses(); 
-            webPanel.Stop(); 
+            mediaServer?.StopProcesses();
+            webPanel?.Stop();
+            trayIcon?.Dispose();
         }
-        private void Form1_Resize(object sender, EventArgs e) { if (isTransmitting && this.WindowState == FormWindowState.Minimized) HideForm(); }
-        private void TrayIcon_DoubleClick(object sender, EventArgs e) { ShowFormSafe(); }
-        private void HideForm() { this.Hide(); trayIcon.Visible = true; }
-        internal void ShowFormSafe() { this.Show(); this.WindowState = FormWindowState.Normal; this.Activate(); }
-                private string pendingUpdateUrl = null;
-        private bool hasPendingBinUpdate = false;
 
-        public async System.Threading.Tasks.Task RunBackgroundUpdateCheck()
+        private void AppWindow_Changed(AppWindow sender, AppWindowChangedEventArgs args)
         {
-            var updateInfo = await Core.Updater.CheckForUpdatesAsync();
-            
-            await Core.DependencyManager.CheckForNewVersionsAsync();
-            bool hasBinUpdate = Core.DependencyManager.HasFfmpegUpdate || Core.DependencyManager.HasMtxUpdate;
+            if (args.DidPresenterChange && _appWindow.Presenter is OverlappedPresenter presenter)
+            {
+                if (isTransmitting && presenter.State == OverlappedPresenterState.Minimized)
+                {
+                    HideForm();
+                }
+            }
+        }
+
+        private void HideForm()
+        {
+            try
+            {
+                if (trayIcon != null) trayIcon.Visible = true;
+                _appWindow?.Hide();
+            }
+            catch { }
+        }
+
+        internal void ShowFormSafe()
+        {
+            try
+            {
+                _appWindow?.Show();
+                if (_appWindow?.Presenter is OverlappedPresenter presenter && presenter.State == OverlappedPresenterState.Minimized)
+                {
+                    presenter.Restore();
+                }
+                this.Activate();
+            }
+            catch { }
+        }
+
+        public async Task RunBackgroundUpdateCheck()
+        {
+            var updateInfo = await Updater.CheckForUpdatesAsync();
+            await DependencyManager.CheckForNewVersionsAsync();
+            bool hasBinUpdate = DependencyManager.HasFfmpegUpdate || DependencyManager.HasMtxUpdate;
 
             if (updateInfo.HasUpdate || hasBinUpdate)
             {
@@ -491,77 +1025,198 @@ namespace ScreenToRTSP
                 if (hasBinUpdate) msg += "Novas versões do FFmpeg/MediaMTX disponíveis!\n";
                 msg += "Clique aqui para atualizar.";
 
-                InvokeSafe(() => {
-                    trayIcon.BalloonTipTitle = "Atualização Disponível";
-                    trayIcon.BalloonTipText = msg;
-                    trayIcon.ShowBalloonTip(10000);
+                InvokeSafe(() =>
+                {
+                    RefreshAboutVersionLabels();
+                    InfoBarUpdate.Title = LanguageManager.Get("UpdateAvailable");
+                    InfoBarUpdate.Message = msg.Replace("\n", " ");
+                    InfoBarUpdate.Severity = InfoBarSeverity.Warning;
+                    InfoBarUpdate.IsOpen = true;
+                    btnUpdateBinaries.Visibility = Visibility.Visible;
+
+                    trayIcon?.ShowBalloonTip("Atualização Disponível", msg);
                     this.pendingUpdateUrl = updateInfo.DownloadUrl;
                     this.hasPendingBinUpdate = hasBinUpdate;
                 });
             }
         }
 
-        public void StartAuto() { HideForm(); watchdogTimer.Start(); if (!chkSchedule.Checked) BtnStart_Click(null, null); }
+        public void StartAuto()
+        {
+            HideForm();
+            watchdogTimer.Start();
+            if (!chkSchedule.IsOn) BtnStart_Click(null, null);
+        }
 
         public void InvokeSafe(Action action)
         {
-            if (this.InvokeRequired) this.Invoke((System.Windows.Forms.MethodInvoker)delegate { action(); });
-            else action();
+            if (DispatcherQueue == null || DispatcherQueue.HasThreadAccess)
+            {
+                action();
+            }
+            else
+            {
+                var tcs = new TaskCompletionSource<bool>();
+                if (!DispatcherQueue.TryEnqueue(() =>
+                {
+                    try
+                    {
+                        action();
+                        tcs.TrySetResult(true);
+                    }
+                    catch (Exception ex)
+                    {
+                        tcs.TrySetException(ex);
+                    }
+                }))
+                {
+                    tcs.TrySetResult(false);
+                }
+                tcs.Task.GetAwaiter().GetResult();
+            }
         }
 
-        internal void StartClick() { BtnStart_Click(null, null); }
-        internal void StopClick() { BtnStop_Click(null, null); }
-        internal void TriggerSave() { SaveSettings(); }
+        internal void StartClick() => BtnStart_Click(null, null);
+        internal void StopClick() => BtnStop_Click(null, null);
+        internal void TriggerSave() => SaveSettings();
 
         internal void UpdateUrlStatus()
         {
-            InvokeSafe(() => {
+            InvokeSafe(() =>
+            {
                 string labelText = "";
                 if (isTransmitting)
                 {
-                    string actualPass = string.IsNullOrEmpty(txtPassword.Text) ? currentPassword : txtPassword.Text;
-                    string auth = (chkAuth.Checked && !string.IsNullOrEmpty(txtUsername.Text) && !string.IsNullOrEmpty(actualPass)) ? $"{txtUsername.Text}:{actualPass}@" : "";
+                    string actualPass = string.IsNullOrEmpty(txtPassword.Password) ? currentPassword : txtPassword.Password;
+                    string auth = (chkAuth.IsOn && !string.IsNullOrEmpty(txtUsername.Text) && !string.IsNullOrEmpty(actualPass))
+                        ? $"{txtUsername.Text}:{actualPass}@"
+                        : "";
                     string streamName = string.IsNullOrWhiteSpace(txtStreamName.Text) ? "camera1" : txtStreamName.Text.Trim().Trim('/');
 
                     currentLanUrl = $"rtsp://{auth}{mediaServer.GetLocalIPAddress()}:{txtPort.Text}/{streamName}";
                     currentLanLowUrl = $"rtsp://{auth}{mediaServer.GetLocalIPAddress()}:{txtPort.Text}/{streamName}_low";
-                    
-                    labelText += $"Principal: {currentLanUrl}\n";
-                    if (chkDualStream.Checked) labelText += $"Leve: {currentLanLowUrl}";
-                    
-                    btnCopyLan.Visible = true;
-                    btnCopyLocal.Visible = chkDualStream.Checked;
+
+                    labelText += $"Principal: {currentLanUrl}";
+                    if (chkDualStream.IsOn) labelText += $"\nLeve:      {currentLanLowUrl}";
+
+                    btnCopyLan.Visibility = Visibility.Visible;
+                    btnCopyLocal.Visibility = chkDualStream.IsOn ? Visibility.Visible : Visibility.Collapsed;
                 }
                 else
                 {
                     labelText = LanguageManager.Get("StatusWaitingLinks");
-                    btnCopyLan.Visible = false;
-                    btnCopyLocal.Visible = false;
+                    btnCopyLan.Visibility = Visibility.Collapsed;
+                    btnCopyLocal.Visibility = Visibility.Collapsed;
                 }
 
-                if (chkWebServer.Checked)
+                if (chkWebServer.IsOn)
                 {
                     currentWebUrl = $"http://{mediaServer.GetLocalIPAddress()}:{txtWebPort.Text}";
                     if (lblWebUrl != null) lblWebUrl.Text = currentWebUrl;
-                    btnCopyWeb.Visible = true;
+                    btnCopyWeb.Visibility = Visibility.Visible;
                 }
                 else
                 {
                     if (lblWebUrl != null) lblWebUrl.Text = "";
-                    btnCopyWeb.Visible = false;
+                    btnCopyWeb.Visibility = Visibility.Collapsed;
                 }
-                
+
                 lblUrl.Text = labelText.TrimEnd('\n');
             });
         }
     }
+
+    public sealed class WinUITextBoxWriter : TextWriter
+    {
+        private readonly TextBox _textBox;
+        private readonly DispatcherQueue _dispatcher;
+        private readonly int _maxLines;
+        private readonly Queue<string> _lines = new Queue<string>();
+        private readonly StringBuilder _currentLine = new StringBuilder();
+        private readonly object _sync = new object();
+        private bool _uiUpdatePending = false;
+
+        public WinUITextBoxWriter(TextBox textBox, DispatcherQueue dispatcher, int maxLines = 300)
+        {
+            _textBox = textBox;
+            _dispatcher = dispatcher;
+            _maxLines = Math.Max(10, maxLines);
+        }
+
+        public void Clear()
+        {
+            lock (_sync)
+            {
+                _lines.Clear();
+                _currentLine.Clear();
+            }
+        }
+
+        public override void Write(char value) => Write(value.ToString());
+
+        public override void Write(string value)
+        {
+            if (string.IsNullOrEmpty(value) || _dispatcher == null) return;
+
+            bool shouldSchedule = false;
+            lock (_sync)
+            {
+                for (int i = 0; i < value.Length; i++)
+                {
+                    char c = value[i];
+                    if (c == '\r') continue;
+                    if (c == '\n')
+                    {
+                        _lines.Enqueue(_currentLine.ToString());
+                        _currentLine.Clear();
+                        while (_lines.Count > _maxLines)
+                        {
+                            _lines.Dequeue();
+                        }
+                    }
+                    else
+                    {
+                        _currentLine.Append(c);
+                    }
+                }
+
+                if (!_uiUpdatePending)
+                {
+                    _uiUpdatePending = true;
+                    shouldSchedule = true;
+                }
+            }
+
+            if (shouldSchedule)
+            {
+                _dispatcher.TryEnqueue(() =>
+                {
+                    string snapshot;
+                    lock (_sync)
+                    {
+                        _uiUpdatePending = false;
+                        var sb = new StringBuilder();
+                        foreach (var line in _lines)
+                        {
+                            sb.AppendLine(line);
+                        }
+                        if (_currentLine.Length > 0)
+                        {
+                            sb.Append(_currentLine);
+                        }
+                        snapshot = sb.ToString();
+                    }
+
+                    try
+                    {
+                        _textBox.Text = snapshot;
+                        _textBox.SelectionStart = _textBox.Text.Length;
+                    }
+                    catch { }
+                });
+            }
+        }
+
+        public override Encoding Encoding => Encoding.UTF8;
+    }
 }
-
-
-
-
-
-
-
-
-

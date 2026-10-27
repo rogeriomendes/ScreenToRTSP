@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
-using System.Windows.Forms;
 
 namespace ScreenToRTSP.Core
 {
@@ -23,8 +22,16 @@ namespace ScreenToRTSP.Core
 
         public string GetLocalIPAddress()
         {
-            var host = Dns.GetHostEntry(Dns.GetHostName());
-            foreach (var ip in host.AddressList) if (ip.AddressFamily == AddressFamily.InterNetwork) return ip.ToString();
+            try
+            {
+                var host = Dns.GetHostEntry(Dns.GetHostName());
+                foreach (var ip in host.AddressList)
+                {
+                    if (ip.AddressFamily == AddressFamily.InterNetwork)
+                        return ip.ToString();
+                }
+            }
+            catch { }
             return "127.0.0.1";
         }
 
@@ -59,7 +66,16 @@ namespace ScreenToRTSP.Core
             if (mediamtxProcess == null || mediamtxProcess.HasExited)
             {
                 mediamtxProcess = new Process();
-                mediamtxProcess.StartInfo = new ProcessStartInfo { FileName = mediamtxExe, WorkingDirectory = config.AppDataPath, Arguments = "mediamtx.yml", UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true };
+                mediamtxProcess.StartInfo = new ProcessStartInfo
+                {
+                    FileName = mediamtxExe,
+                    WorkingDirectory = config.AppDataPath,
+                    Arguments = "mediamtx.yml",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true
+                };
                 mediamtxProcess.OutputDataReceived += (s, e) => { if (e.Data != null) Console.WriteLine("[MediaMTX] " + e.Data); };
                 mediamtxProcess.ErrorDataReceived += (s, e) => { if (e.Data != null) Console.WriteLine("[MediaMTX] " + e.Data); };
                 mediamtxProcess.Start();
@@ -78,12 +94,13 @@ namespace ScreenToRTSP.Core
             if (ffmpegProcess != null && !ffmpegProcess.HasExited) return;
 
             string auth = "";
-            if (config.UseAuth && !string.IsNullOrEmpty(config.Username) && !string.IsNullOrEmpty(config.Password)) auth = $"{(config.Username)}:{(config.Password)}@";
+            if (config.UseAuth && !string.IsNullOrEmpty(config.Username) && !string.IsNullOrEmpty(config.Password))
+                auth = $"{config.Username}:{config.Password}@";
 
             string streamName = string.IsNullOrWhiteSpace(config.StreamName) ? "camera1" : config.StreamName.Trim().Trim('/');
             string rtspUrl = $"rtsp://{auth}127.0.0.1:{config.Port}/{streamName}";
             string rtspUrlLow = $"rtsp://{auth}127.0.0.1:{config.Port}/{streamName}_low";
-            
+
             string bitrate = config.QualityIndex == 0 ? "1M" : (config.QualityIndex == 2 ? "6M" : "3M");
             string encoderArgs = $"-c:v libx264 -preset ultrafast -tune zerolatency -g {config.Fps}";
             if (config.EncoderIndex == 1) encoderArgs = $"-c:v h264_nvenc -preset p1 -tune ull -g {config.Fps}";
@@ -100,9 +117,17 @@ namespace ScreenToRTSP.Core
 
             string captureFormat = forceGdigrab ? "gdigrab" : "ddagrab";
             string ffmpegArgs = $"-f {captureFormat} -framerate {config.Fps} {monitorArgs} {encoderArgs} -b:v {bitrate} -pix_fmt yuv420p -f rtsp {rtspUrl}{dualStreamArgs}";
-            
+
             ffmpegProcess = new Process();
-            ffmpegProcess.StartInfo = new ProcessStartInfo { FileName = ffmpegExe, Arguments = ffmpegArgs, UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true };
+            ffmpegProcess.StartInfo = new ProcessStartInfo
+            {
+                FileName = ffmpegExe,
+                Arguments = ffmpegArgs,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true
+            };
             ffmpegProcess.OutputDataReceived += (s, e) => { if (e.Data != null) Console.WriteLine("[FFMPEG] " + e.Data); };
             ffmpegProcess.ErrorDataReceived += (s, e) => { if (e.Data != null) Console.WriteLine("[FFMPEG] " + e.Data); };
             ffmpegProcess.Start();
@@ -112,7 +137,7 @@ namespace ScreenToRTSP.Core
 
             if (!forceGdigrab)
             {
-                System.Threading.Tasks.Task.Run(async () => 
+                System.Threading.Tasks.Task.Run(async () =>
                 {
                     await System.Threading.Tasks.Task.Delay(1500);
                     if (ffmpegProcess == null) return;
@@ -129,11 +154,13 @@ namespace ScreenToRTSP.Core
         {
             try { if (ffmpegProcess != null && !ffmpegProcess.HasExited) ffmpegProcess.Kill(); } catch { } finally { ffmpegProcess = null; }
             try { if (mediamtxProcess != null && !mediamtxProcess.HasExited) mediamtxProcess.Kill(); } catch { } finally { mediamtxProcess = null; }
-            if (currentConfig != null) {
-                foreach (var p in Process.GetProcessesByName("ffmpeg")) try { if (p.MainModule.FileName == Path.Combine(currentConfig.AppDataPath, "ffmpeg.exe")) p.Kill(); } catch { }
-                foreach (var p in Process.GetProcessesByName("mediamtx")) try { if (p.MainModule.FileName == Path.Combine(currentConfig.AppDataPath, "mediamtx.exe")) p.Kill(); } catch { }
+            if (currentConfig != null)
+            {
+                foreach (var p in Process.GetProcessesByName("ffmpeg"))
+                    try { if (p.MainModule.FileName == Path.Combine(currentConfig.AppDataPath, "ffmpeg.exe")) p.Kill(); } catch { }
+                foreach (var p in Process.GetProcessesByName("mediamtx"))
+                    try { if (p.MainModule.FileName == Path.Combine(currentConfig.AppDataPath, "mediamtx.exe")) p.Kill(); } catch { }
             }
         }
     }
 }
-

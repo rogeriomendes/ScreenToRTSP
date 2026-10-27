@@ -7,6 +7,7 @@ Ideal para integrar a visualização da tela do seu PC direto no seu DVR/NVR (Gr
 
 ## 🚀 Funcionalidades
 
+* **Interface Nativa WinUI 3 (Fluent Design)**: Construída com a versão mais recente do **Windows App SDK (WinUI 3)**, trazendo efeito translúcido **Mica** nativo do Windows 11, cartões no estilo Configurações do Windows e alternância instantânea entre os temas **Sistema, Escuro e Claro**.
 * **Captura de Múltiplos Monitores**: Escolha um monitor específico ou capture todos eles simultaneamente.
 * **Dual Stream**: Transmissão simultânea de um canal principal (Alta Resolução) e um canal extra super leve (Sub-stream), ideal para visualização em mosaico.
 * **Aceleração de Hardware**: Suporte para codificação de vídeo via placa de vídeo usando **NVIDIA (NVENC)**, **Intel (QSV)** ou processamento por CPU.
@@ -18,19 +19,18 @@ Ideal para integrar a visualização da tela do seu PC direto no seu DVR/NVR (Gr
 
 ## 🛠️ Como Compilar (Para Desenvolvedores)
 
-O aplicativo fará o download automático de dois executáveis de terceiros (`ffmpeg.exe` e `mediamtx.exe`) na primeira vez que for executado, buscando diretamente das releases oficiais no GitHub. Isso mantém o executável principal extremamente leve.
+O aplicativo fará o download automático de dois executáveis de terceiros (`ffmpeg.exe` e `mediamtx.exe`) na primeira vez que for executado, buscando diretamente das releases oficiais no GitHub. Isso mantém o pacote principal leve.
 
 Se você está curioso sobre os binários ou quer saber a fonte deles, eles são baixados dinamicamente de:
 * **FFmpeg**: [Gyan.dev FFmpeg Builds](https://github.com/GyanD/codexffmpeg/releases/latest)
 * **MediaMTX** (Servidor RTSP leve): [bluenviron/mediamtx](https://github.com/bluenviron/mediamtx/releases/latest)
 
 ### Gerando o Executável
-Para gerar o seu próprio arquivo `.exe` a partir do código-fonte, basta dar um clique duplo no script:
+Para compilar o projeto WinUI 3 (`.NET 10` + `Windows App SDK`) a partir do código-fonte, basta dar um clique duplo no script:
 
 `build.bat`
 
-Isso vai compilar o código em C# em um único arquivo `.exe` autocontido.
-O executável resultante será salvo na pasta **`build`**, que é criada automaticamente.
+Isso vai compilar e publicar a aplicação WinUI 3 autocontida diretamente na pasta **`build`**, que é criada automaticamente.
 
 ## 📄 Licença
 

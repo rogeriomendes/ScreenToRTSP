@@ -10,12 +10,12 @@ taskkill /F /IM ScreenToRTSP.exe /T >nul 2>&1
 taskkill /F /IM "ScreenToRTSP*" /T >nul 2>&1
 ping 127.0.0.1 -n 3 > nul
 
-echo [2/3] Compilando o projeto em um arquivo unico (Release)...
-dotnet publish -c Release -r win-x64 -p:PublishSingleFile=true --self-contained true
+echo [2/3] Compilando o projeto WinUI 3 (Release)...
+dotnet publish -c Release -r win-x64 --self-contained true -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true
 
-echo [3/3] Movendo o executavel pronto para a pasta 'build'...
+echo [3/3] Copiando os arquivos publicados para a pasta 'build'...
 if not exist build mkdir build
-copy /Y "bin\Release\net10.0-windows\win-x64\publish\ScreenToRTSP.exe" "build\ScreenToRTSP.exe"
+xcopy /Y /E /I "bin\Release\net10.0-windows10.0.22621.0\win-x64\publish\*" "build\" >nul
 
 echo.
 echo ===========================================

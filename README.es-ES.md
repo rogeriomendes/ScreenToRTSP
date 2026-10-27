@@ -7,6 +7,7 @@ Ideal para integrar la visualización de la pantalla de tu PC directamente en tu
 
 ## 🚀 Características
 
+* **Interfaz Nativa WinUI 3 (Fluent Design)**: Desarrollada con la última versión de **Windows App SDK (WinUI 3)** con material translúcido **Mica** nativo de Windows 11, tarjetas estilo Configuración de Windows y cambio instantáneo entre temas **Sistema, Oscuro y Claro**.
 * **Captura de Múltiples Monitores**: Elige un monitor específico o captúralos todos simultáneamente.
 * **Transmisión Dual (Dual Stream)**: Transmisión simultánea de un canal principal (Alta Resolución) y un canal extra muy ligero (Sub-stream), ideal para visualización en mosaico.
 * **Aceleración por Hardware**: Soporte para codificación de video mediante tarjeta gráfica usando **NVIDIA (NVENC)**, **Intel (QSV)** o procesamiento por CPU.
@@ -18,19 +19,18 @@ Ideal para integrar la visualización de la pantalla de tu PC directamente en tu
 
 ## 🛠️ Cómo Compilar (Para Desarrolladores)
 
-La aplicación descargará automáticamente dos ejecutables de terceros (`ffmpeg.exe` y `mediamtx.exe`) la primera vez que se ejecute, obtenidos directamente desde los lanzamientos oficiales en GitHub. Esto mantiene el ejecutable principal extremadamente ligero.
+La aplicación descargará automáticamente dos ejecutables de terceros (`ffmpeg.exe` y `mediamtx.exe`) la primera vez que se ejecute, obtenidos directamente desde los lanzamientos oficiales en GitHub. Esto mantiene el paquete principal ligero.
 
 Si tienes curiosidad sobre los binarios o quieres conocer su origen, se descargan dinámicamente de:
 * **FFmpeg**: [Gyan.dev FFmpeg Builds](https://github.com/GyanD/codexffmpeg/releases/latest)
 * **MediaMTX** (Servidor RTSP ligero): [bluenviron/mediamtx](https://github.com/bluenviron/mediamtx/releases/latest)
 
 ### Generando el Ejecutable
-Para generar tu propio archivo `.exe` a partir del código fuente, simplemente haz doble clic en el script:
+Para compilar el proyecto WinUI 3 (`.NET 10` + `Windows App SDK`) a partir del código fuente, simplemente haz doble clic en el script:
 
 `build.bat`
 
-Esto compilará el código C# en un único archivo `.exe` independiente.
-El ejecutable resultante se guardará en la carpeta **`build`**, la cual se crea automáticamente.
+Esto compilará y publicará la aplicación WinUI 3 independiente directamente en la carpeta **`build`**, la cual se crea automáticamente.
 
 ## 📄 Licencia
 

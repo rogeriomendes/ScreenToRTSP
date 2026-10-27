@@ -7,6 +7,7 @@ Ideal for integrating PC screen viewing directly into your DVR/NVR (Network Vide
 
 ## 🚀 Features
 
+* **Native WinUI 3 Interface (Fluent Design)**: Built on the latest **Windows App SDK (WinUI 3)** with native Windows 11 **Mica** material, Settings-style cards, and instant **System / Dark / Light** theme switching.
 * **Multi-Monitor Capture**: Choose a specific monitor or capture all of them.
 * **Dual Stream**: Simultaneous transmission of a main channel (High Resolution) and an extra lightweight channel (Sub-stream), ideal for mosaic viewing.
 * **Hardware Acceleration**: Support for video encoding via GPU using **NVIDIA (NVENC)**, **Intel (QSV)**, or via Processor (CPU).
@@ -18,19 +19,18 @@ Ideal for integrating PC screen viewing directly into your DVR/NVR (Network Vide
 
 ## 🛠️ How to Build (For Developers)
 
-The application automatically downloads two third-party executables (`ffmpeg.exe` and `mediamtx.exe`) on its first run directly from their official GitHub releases. This keeps the main executable extremely lightweight.
+The application automatically downloads two third-party executables (`ffmpeg.exe` and `mediamtx.exe`) on its first run directly from their official GitHub releases. This keeps the main package lightweight.
 
 If you are curious about the binaries or want to know their source, they are dynamically fetched from:
 * **FFmpeg**: [Gyan.dev FFmpeg Builds](https://github.com/GyanD/codexffmpeg/releases/latest)
 * **MediaMTX** (Lightweight RTSP server): [bluenviron/mediamtx](https://github.com/bluenviron/mediamtx/releases/latest)
 
 ### Generating the Executable
-To generate your own `.exe` file from the source code, simply double-click the script:
+To compile the WinUI 3 project (`.NET 10` + `Windows App SDK`) from source code, simply double-click the script:
 
 `build.bat`
 
-This will compile the C# code into a single, self-contained `.exe`.
-The resulting executable will be saved in the **`build`** folder, which is created automatically.
+This will compile and publish the self-contained WinUI 3 application into the **`build`** folder, which is created automatically.
 
 ## 📄 License
 

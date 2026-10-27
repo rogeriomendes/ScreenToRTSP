@@ -1,0 +1,45 @@
+<Window
+    x:Class="ScreenToRTSP.UI.DependencyDownloadWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Screen To RTSP - Download">
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid Padding="28" RowSpacing="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Spacing="6">
+            <TextBlock
+                Text="Baixando componentes essenciais"
+                Style="{StaticResource SubtitleTextBlockStyle}" />
+            <TextBlock
+                Text="Baixando FFmpeg e MediaMTX. Isso ocorrerá apenas uma vez. Aguarde..."
+                Style="{StaticResource BodyTextBlockStyle}"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                TextWrapping="Wrap" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" VerticalAlignment="Center" Spacing="10">
+            <TextBlock
+                x:Name="LblProgress"
+                Text="Iniciando..."
+                FontWeight="SemiBold"
+                FontSize="15"
+                HorizontalAlignment="Center" />
+            <ProgressBar
+                x:Name="PbDownload"
+                Minimum="0"
+                Maximum="100"
+                Value="0"
+                IsIndeterminate="True"
+                Height="8" />
+        </StackPanel>
+    </Grid>
+</Window>

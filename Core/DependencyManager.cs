@@ -3,13 +3,17 @@ using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Threading.Tasks;
-using System.Windows.Forms;
-using System.Drawing;
 using SharpCompress.Archives;
-using SharpCompress.Archives.SevenZip;
 
 namespace ScreenToRTSP.Core
 {
+    public struct DependencyProgress
+    {
+        public string StatusText { get; set; }
+        public double Percent { get; set; }
+        public bool IsIndeterminate { get; set; }
+    }
+
     public static class DependencyManager
     {
         public static bool HasUpdateAvailable { get; private set; } = false;
@@ -18,7 +22,15 @@ namespace ScreenToRTSP.Core
         public static string MtxLatestVersionStr { get; private set; } = "";
         public static string FfmpegLatestVersionStr { get; private set; } = "";
 
-        public static bool CheckAndDownloadDependencies(bool force = false)
+        public static bool AreDependenciesInstalled()
+        {
+            string appDir = AppDomain.CurrentDomain.BaseDirectory;
+            string ffmpeg = Path.Combine(appDir, "ffmpeg.exe");
+            string mediamtx = Path.Combine(appDir, "mediamtx.exe");
+            return File.Exists(ffmpeg) && File.Exists(mediamtx);
+        }
+
+        public static async Task<bool> DownloadDependenciesAsync(bool force = false, IProgress<DependencyProgress> progress = null)
         {
             string appDir = AppDomain.CurrentDomain.BaseDirectory;
             string ffmpeg = Path.Combine(appDir, "ffmpeg.exe");
@@ -27,8 +39,8 @@ namespace ScreenToRTSP.Core
             bool needFfmpeg = !File.Exists(ffmpeg) || (force && HasFfmpegUpdate);
             bool needMtx = !File.Exists(mediamtx) || (force && HasMtxUpdate);
 
-            // Se forçam a atualização, mas nenhum dos dois precisa (e.g., clicou sem ter update?), fallback:
-            if (force && !needFfmpeg && !needMtx) {
+            if (force && !needFfmpeg && !needMtx)
+            {
                 needFfmpeg = true;
                 needMtx = true;
             }
@@ -38,139 +50,89 @@ namespace ScreenToRTSP.Core
                 return true;
             }
 
-            Form dlForm = new Form
+            try
             {
-                Text = "Screen to RTSP - Download",
-                Size = new Size(450, 180),
-                FormBorderStyle = FormBorderStyle.FixedDialog,
-                StartPosition = FormStartPosition.CenterScreen,
-                MaximizeBox = false,
-                MinimizeBox = false,
-                ShowIcon = false,
-                ShowInTaskbar = true,
-                TopMost = true
-            };
+                string mtxZip = Path.Combine(appDir, "mediamtx_temp.zip");
+                string ffmpeg7z = Path.Combine(appDir, "ffmpeg_temp.7z");
 
-            Label lblStatus = new Label
-            {
-                Text = "Baixando componentes essenciais (FFmpeg e MediaMTX)...\nIsso ocorrerá apenas uma vez. Aguarde...",
-                AutoSize = false,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Dock = DockStyle.Top,
-                Height = 60,
-                Font = new Font("Segoe UI", 10)
-            };
-
-            ProgressBar pb = new ProgressBar
-            {
-                Style = ProgressBarStyle.Continuous,
-                Dock = DockStyle.Bottom,
-                Height = 30
-            };
-
-            Label lblProgress = new Label
-            {
-                Text = "Iniciando...",
-                AutoSize = false,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Dock = DockStyle.Fill,
-                Font = new Font("Segoe UI", 12, FontStyle.Bold),
-                ForeColor = Color.FromArgb(22, 163, 74)
-            };
-
-            dlForm.Controls.Add(lblProgress);
-            dlForm.Controls.Add(lblStatus);
-            dlForm.Controls.Add(pb);
-
-            bool success = false;
-
-            dlForm.Shown += async (s, e) =>
-            {
-                try
+                if (needFfmpeg)
                 {
-                    string mtxZip = Path.Combine(appDir, "mediamtx_temp.zip");
-                    string ffmpeg7z = Path.Combine(appDir, "ffmpeg_temp.7z");
+                    progress?.Report(new DependencyProgress { StatusText = "Buscando link do FFmpeg...", Percent = 0, IsIndeterminate = true });
+                    string ffmpegUrl = await GetLatestReleaseAssetUrl("GyanD/codexffmpeg", "essentials_build.7z");
+                    if (string.IsNullOrEmpty(ffmpegUrl)) throw new Exception("Não foi possível encontrar a última versão do FFmpeg.");
 
-                    // Step 1: Downloads
-                    if (needFfmpeg)
+                    await DownloadFileWithProgress(ffmpegUrl, ffmpeg7z, progress, "FFmpeg");
+                }
+
+                if (needMtx)
+                {
+                    progress?.Report(new DependencyProgress { StatusText = "Buscando link do MediaMTX...", Percent = 0, IsIndeterminate = true });
+                    string mtxUrl = await GetLatestReleaseAssetUrl("bluenviron/mediamtx", "windows_amd64.zip");
+                    if (string.IsNullOrEmpty(mtxUrl)) throw new Exception("Não foi possível encontrar a última versão do MediaMTX.");
+
+                    await DownloadFileWithProgress(mtxUrl, mtxZip, progress, "MediaMTX");
+                }
+
+                if (needFfmpeg)
+                {
+                    progress?.Report(new DependencyProgress { StatusText = "Extraindo FFmpeg...", Percent = 100, IsIndeterminate = true });
+                    await Task.Run(() =>
                     {
-                        dlForm.Invoke((MethodInvoker)(() => lblProgress.Text = "Buscando link do FFmpeg..."));
-                        string ffmpegUrl = await GetLatestReleaseAssetUrl("GyanD/codexffmpeg", "essentials_build.7z");
-                        if (string.IsNullOrEmpty(ffmpegUrl)) throw new Exception("Não foi possível encontrar a última versão do FFmpeg.");
-
-                        await DownloadFileWithProgress(ffmpegUrl, ffmpeg7z, dlForm, pb, lblProgress, "FFmpeg");
-                    }
-
-                    if (needMtx)
-                    {
-                        dlForm.Invoke((MethodInvoker)(() => lblProgress.Text = "Buscando link do MediaMTX..."));
-                        string mtxUrl = await GetLatestReleaseAssetUrl("bluenviron/mediamtx", "windows_amd64.zip");
-                        if (string.IsNullOrEmpty(mtxUrl)) throw new Exception("Não foi possível encontrar a última versão do MediaMTX.");
-
-                        await DownloadFileWithProgress(mtxUrl, mtxZip, dlForm, pb, lblProgress, "MediaMTX");
-                    }
-
-                    // Step 2: Extractions
-                    if (needMtx || needFfmpeg)
-                    {
-                        dlForm.Invoke((MethodInvoker)(() => { pb.Style = ProgressBarStyle.Marquee; }));
-                    }
-
-                    if (needFfmpeg)
-                    {
-                        dlForm.Invoke((MethodInvoker)(() => { lblProgress.Text = "Extraindo FFmpeg..."; }));
-                        await Task.Run(() =>
+                        using (var archive = ArchiveFactory.OpenArchive(ffmpeg7z))
                         {
-                            using (var archive = SharpCompress.Archives.ArchiveFactory.OpenArchive(ffmpeg7z))
+                            foreach (var entry in archive.Entries)
                             {
-                                foreach (var entry in archive.Entries)
+                                if (!entry.IsDirectory && entry.Key.EndsWith("ffmpeg.exe", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    if (!entry.IsDirectory && entry.Key.EndsWith("ffmpeg.exe", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        entry.WriteToFile(ffmpeg, new SharpCompress.Common.ExtractionOptions { ExtractFullPath = false, Overwrite = true });
-                                        break;
-                                    }
+                                    entry.WriteToFile(ffmpeg, new SharpCompress.Common.ExtractionOptions { ExtractFullPath = false, Overwrite = true });
+                                    break;
                                 }
                             }
-                            File.Delete(ffmpeg7z);
-                        });
-                    }
+                        }
+                        File.Delete(ffmpeg7z);
+                    });
+                }
 
-                    if (needMtx)
+                if (needMtx)
+                {
+                    progress?.Report(new DependencyProgress { StatusText = "Extraindo MediaMTX...", Percent = 100, IsIndeterminate = true });
+                    await Task.Run(() =>
                     {
-                        dlForm.Invoke((MethodInvoker)(() => { lblProgress.Text = "Extraindo MediaMTX..."; }));
-                        await Task.Run(() =>
+                        using (var archive = ZipFile.OpenRead(mtxZip))
                         {
-                            using (var archive = ZipFile.OpenRead(mtxZip))
+                            foreach (var entry in archive.Entries)
                             {
-                                foreach (var entry in archive.Entries)
+                                if (entry.Name.Equals("mediamtx.exe", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    if (entry.Name.Equals("mediamtx.exe", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        entry.ExtractToFile(mediamtx, true);
-                                        break;
-                                    }
+                                    entry.ExtractToFile(mediamtx, true);
+                                    break;
                                 }
                             }
-                            File.Delete(mtxZip);
-                        });
-                    }
-
-                    dlForm.Invoke((MethodInvoker)(() => pb.Style = ProgressBarStyle.Continuous));
-
-                    success = true;
-                    HasUpdateAvailable = false;
-                    dlForm.Close();
+                        }
+                        File.Delete(mtxZip);
+                    });
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Erro ao baixar dependências: {ex.Message}\n\nVerifique sua conexão com a internet ou tente novamente mais tarde.", "Erro de Download", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    dlForm.Close();
-                }
-            };
 
-            dlForm.ShowDialog();
-            return success;
+                progress?.Report(new DependencyProgress { StatusText = "Concluído!", Percent = 100, IsIndeterminate = false });
+                HasUpdateAvailable = false;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MonitorHelper.ShowMessage(
+                    $"Erro ao baixar dependências: {ex.Message}\n\nVerifique sua conexão com a internet ou tente novamente mais tarde.",
+                    "Erro de Download",
+                    MonitorHelper.MB_ICONERROR);
+                return false;
+            }
+        }
+
+        public static bool CheckAndDownloadDependencies(bool force = false)
+        {
+            if (!force && AreDependenciesInstalled())
+                return true;
+
+            return Task.Run(() => DownloadDependenciesAsync(force, null)).GetAwaiter().GetResult();
         }
 
         private static async Task<System.Text.Json.JsonElement> GetLatestRelease(string repoUrl)
@@ -202,7 +164,8 @@ namespace ScreenToRTSP.Core
                         }
                     }
                 }
-            } catch { }
+            }
+            catch { }
             return null;
         }
 
@@ -225,12 +188,11 @@ namespace ScreenToRTSP.Core
                 HasMtxUpdate = false;
                 HasFfmpegUpdate = false;
 
-                // Simple check if the latest tag is not present in the current version string
                 if (!string.IsNullOrEmpty(mtxLatest) && mtxCurrent != "N/A" && !mtxCurrent.Contains(mtxLatest)) HasMtxUpdate = true;
                 if (!string.IsNullOrEmpty(ffmpegLatest) && ffmpegCurrent != "N/A" && !ffmpegCurrent.Contains(ffmpegLatest)) HasFfmpegUpdate = true;
-                
+
                 HasUpdateAvailable = HasMtxUpdate || HasFfmpegUpdate;
-                
+
                 return HasUpdateAvailable;
             }
             catch
@@ -240,7 +202,7 @@ namespace ScreenToRTSP.Core
             }
         }
 
-        private static async Task DownloadFileWithProgress(string url, string destination, Form dlForm, ProgressBar pb, Label lblProgress, string componentName)
+        private static async Task DownloadFileWithProgress(string url, string destination, IProgress<DependencyProgress> progress, string componentName)
         {
             using (HttpClient client = new HttpClient())
             {
@@ -265,12 +227,13 @@ namespace ScreenToRTSP.Core
 
                             if (canReportProgress)
                             {
-                                int percentComplete = (int)((totalRead * 100) / totalBytes);
-                                dlForm.Invoke((MethodInvoker)(() =>
+                                double percentComplete = (double)(totalRead * 100) / totalBytes;
+                                progress?.Report(new DependencyProgress
                                 {
-                                    pb.Value = percentComplete;
-                                    lblProgress.Text = $"{componentName}: {percentComplete}% ({(totalRead / 1024 / 1024)} MB / {(totalBytes / 1024 / 1024)} MB)";
-                                }));
+                                    StatusText = $"{componentName}: {(int)percentComplete}% ({(totalRead / 1024 / 1024)} MB / {(totalBytes / 1024 / 1024)} MB)",
+                                    Percent = percentComplete,
+                                    IsIndeterminate = false
+                                });
                             }
                         }
                     }
@@ -280,11 +243,12 @@ namespace ScreenToRTSP.Core
 
         public static string GetFFmpegVersion()
         {
-            try {
+            try
+            {
                 string appDir = AppDomain.CurrentDomain.BaseDirectory;
                 string ffmpeg = Path.Combine(appDir, "ffmpeg.exe");
                 if (!File.Exists(ffmpeg)) return "N/A";
-                
+
                 var psi = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = ffmpeg,
@@ -304,17 +268,19 @@ namespace ScreenToRTSP.Core
                             return parts[2];
                     }
                 }
-            } catch { }
+            }
+            catch { }
             return "N/A";
         }
 
         public static string GetMediaMTXVersion()
         {
-            try {
+            try
+            {
                 string appDir = AppDomain.CurrentDomain.BaseDirectory;
                 string mediamtx = Path.Combine(appDir, "mediamtx.exe");
                 if (!File.Exists(mediamtx)) return "N/A";
-                
+
                 var psi = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = mediamtx,
@@ -329,7 +295,8 @@ namespace ScreenToRTSP.Core
                     proc.WaitForExit();
                     return output;
                 }
-            } catch { }
+            }
+            catch { }
             return "N/A";
         }
     }

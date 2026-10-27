@@ -3,13 +3,13 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
-using System.Windows.Forms;
 
 namespace ScreenToRTSP.Core
 {
-        public static class Updater
+    public static class Updater
     {
         private const string RepoOwner = "rogeriomendes";
         private const string RepoName = "ScreenToRTSP";
@@ -18,13 +18,27 @@ namespace ScreenToRTSP.Core
         public static string LatestVersionStr { get; private set; } = "";
         public static string LatestDownloadUrl { get; private set; } = "";
 
+        public static string GetAppVersion()
+        {
+            try
+            {
+                var ver = Assembly.GetExecutingAssembly().GetName().Version;
+                if (ver != null)
+                {
+                    return $"{ver.Major}.{ver.Minor}.{ver.Build}";
+                }
+            }
+            catch { }
+            return "2.0.0";
+        }
+
         public static async Task<(bool HasUpdate, string DownloadUrl, string Version)> CheckForUpdatesAsync()
         {
             try
             {
                 using (var client = new HttpClient())
                 {
-                    client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("ScreenToRTSP", "1.0"));
+                    client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("ScreenToRTSP", "2.0"));
                     var response = await client.GetAsync($"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/latest");
                     if (!response.IsSuccessStatusCode) return (false, null, null);
 
@@ -33,12 +47,12 @@ namespace ScreenToRTSP.Core
                     {
                         var root = doc.RootElement;
                         string tagName = root.GetProperty("tag_name").GetString();
-                        
+
                         string latestVersionStr = tagName.TrimStart('v', 'V');
                         if (Version.TryParse(latestVersionStr, out Version latestVersion))
                         {
-                            Version currentVersion = new Version(Application.ProductVersion);
-                            
+                            Version currentVersion = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(2, 0, 0);
+
                             if (latestVersion > currentVersion)
                             {
                                 string downloadUrl = null;
@@ -46,14 +60,15 @@ namespace ScreenToRTSP.Core
                                 foreach (var asset in assets.EnumerateArray())
                                 {
                                     string name = asset.GetProperty("name").GetString();
-                                    if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                                    if (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ||
+                                        name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
                                     {
                                         downloadUrl = asset.GetProperty("browser_download_url").GetString();
                                         break;
                                     }
                                 }
 
-                                                                if (downloadUrl != null)
+                                if (downloadUrl != null)
                                 {
                                     HasAppUpdate = true;
                                     LatestVersionStr = tagName;
@@ -76,10 +91,13 @@ namespace ScreenToRTSP.Core
         {
             try
             {
-                string tempFile = Path.Combine(Path.GetTempPath(), "ScreenToRTSP_Update.exe");
+                bool isZip = downloadUrl.EndsWith(".zip", StringComparison.OrdinalIgnoreCase);
+                string ext = isZip ? ".zip" : ".exe";
+                string tempFile = Path.Combine(Path.GetTempPath(), "ScreenToRTSP_Update" + ext);
+
                 using (var client = new HttpClient())
                 {
-                    client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("ScreenToRTSP", "1.0"));
+                    client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("ScreenToRTSP", "2.0"));
                     var response = await client.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
                     using (var streamToReadFrom = await response.Content.ReadAsStreamAsync())
                     using (var streamToWriteTo = File.Open(tempFile, FileMode.Create))
@@ -88,18 +106,33 @@ namespace ScreenToRTSP.Core
                     }
                 }
 
-                string currentExe = Application.ExecutablePath;
+                string currentExe = Environment.ProcessPath ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ScreenToRTSP.exe");
+                string appDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
                 string scriptPath = Path.Combine(Path.GetTempPath(), "update_ScreenToRTSP.ps1");
-                
                 string resumeArg = isTransmitting ? " --resume" : "";
 
-                string script = $@"
+                string script;
+                if (isZip)
+                {
+                    script = $@"
+Start-Sleep -Seconds 2
+Expand-Archive -Path '{tempFile}' -DestinationPath '{appDir}' -Force
+Remove-Item -Path '{tempFile}' -Force -ErrorAction SilentlyContinue
+Start-Process '{currentExe}' -ArgumentList '{resumeArg}'
+Remove-Item -Path '{scriptPath}' -Force -ErrorAction SilentlyContinue
+";
+                }
+                else
+                {
+                    script = $@"
 Start-Sleep -Seconds 2
 Remove-Item -Path '{currentExe}' -Force
 Move-Item -Path '{tempFile}' -Destination '{currentExe}' -Force
 Start-Process '{currentExe}' -ArgumentList '{resumeArg}'
 Remove-Item -Path '{scriptPath}' -Force
 ";
+                }
+
                 File.WriteAllText(scriptPath, script);
 
                 var psi = new ProcessStartInfo
@@ -111,15 +144,12 @@ Remove-Item -Path '{scriptPath}' -Force
                 };
                 Process.Start(psi);
 
-                Application.Exit();
+                Environment.Exit(0);
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Erro ao baixar a atualização: " + ex.Message, "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MonitorHelper.ShowMessage("Erro ao baixar a atualização: " + ex.Message, "Erro", MonitorHelper.MB_ICONERROR);
             }
         }
     }
 }
-
-
-

@@ -1,0 +1,483 @@
+<Window
+    x:Class="ScreenToRTSP.Main"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    Title="Screen To RTSP">
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="RootGrid" RowDefinitions="48,*,Auto">
+        <!-- Custom Windows 11 TitleBar -->
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Padding="16,0,140,0" ColumnDefinitions="Auto,Auto,*,Auto">
+            <Image
+                Grid.Column="0"
+                Source="ms-appx:///assets/icon.png"
+                Width="20"
+                Height="20"
+                VerticalAlignment="Center"
+                Margin="0,0,12,0" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Spacing="10">
+                <TextBlock
+                    x:Name="LblAppTitle"
+                    Text="Screen To RTSP"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    FontWeight="SemiBold"
+                    VerticalAlignment="Center" />
+                <TextBlock
+                    x:Name="LblAppSubtitle"
+                    Text="Servidor de Transmissão de Tela"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    VerticalAlignment="Center" />
+            </StackPanel>
+
+            <!-- Save Status Pill -->
+            <Border
+                x:Name="SaveStatusBadge"
+                Grid.Column="3"
+                Visibility="Collapsed"
+                Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="10,3"
+                VerticalAlignment="Center">
+                <TextBlock
+                    x:Name="lblSaveStatus"
+                    Text="✔ Configurações salvas!"
+                    FontSize="12"
+                    FontWeight="SemiBold"
+                    Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+            </Border>
+        </Grid>
+
+        <!-- NavigationView Content Shell -->
+        <NavigationView
+            x:Name="NavView"
+            Grid.Row="1"
+            IsBackButtonVisible="Collapsed"
+            IsSettingsVisible="False"
+            IsPaneToggleButtonVisible="False"
+            IsPaneOpen="True"
+            PaneDisplayMode="Left"
+            OpenPaneLength="230"
+            SelectionChanged="NavView_SelectionChanged">
+
+            <NavigationView.MenuItems>
+                <NavigationViewItem x:Name="NavVideo" Tag="video" IsSelected="True">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE714;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="NavNetwork" Tag="network">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE774;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="NavAutomation" Tag="automation">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE823;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="NavConfig" Tag="config">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE713;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="NavLogs" Tag="logs" Content="Logs">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE756;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+
+            <NavigationView.FooterMenuItems>
+                <NavigationViewItem x:Name="NavAbout" Tag="about">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE946;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.FooterMenuItems>
+
+            <Grid Padding="24,12,24,16">
+                <!-- TAB 1: VIDEO -->
+                <ScrollViewer x:Name="PageVideo" Visibility="Visible" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="6" Padding="0,0,8,12">
+                        <TextBlock
+                            x:Name="HeaderVideo"
+                            Text="Vídeo"
+                            Style="{StaticResource TitleTextBlockStyle}"
+                            Margin="0,0,0,10" />
+
+                        <controls:SettingsCard x:Name="CardMonitor">
+                            <controls:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE7F4;" />
+                            </controls:SettingsCard.HeaderIcon>
+                            <ComboBox x:Name="cmbMonitor" x:FieldModifier="internal" MinWidth="220" />
+                        </controls:SettingsCard>
+
+                        <controls:SettingsCard x:Name="CardEncoder">
+                            <controls:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE950;" />
+                            </controls:SettingsCard.HeaderIcon>
+                            <ComboBox x:Name="cmbEncoder" x:FieldModifier="internal" MinWidth="220" />
+                        </controls:SettingsCard>
+
+                        <controls:SettingsCard x:Name="CardQuality">
+                            <controls:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE7F8;" />
+                            </controls:SettingsCard.HeaderIcon>
+                            <ComboBox x:Name="cmbQuality" x:FieldModifier="internal" MinWidth="220" />
+                        </controls:SettingsCard>
+
+                        <controls:SettingsCard x:Name="CardFps">
+                            <controls:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xEC4A;" />
+                            </controls:SettingsCard.HeaderIcon>
+                            <ComboBox x:Name="cmbFps" x:FieldModifier="internal" MinWidth="220" />
+                        </controls:SettingsCard>
+
+                        <controls:SettingsCard x:Name="CardDualStream">
+                            <controls:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE8A9;" />
+                            </controls:SettingsCard.HeaderIcon>
+                            <ToggleSwitch x:Name="chkDualStream" x:FieldModifier="internal" IsOn="True" OnContent="" OffContent="" MinWidth="0" />
+                        </controls:SettingsCard>
+
+                        <controls:SettingsCard x:Name="CardMouseCursor">
+                            <controls:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE8B0;" />
+                            </controls:SettingsCard.HeaderIcon>
+                            <ToggleSwitch x:Name="chkMouseCursor" x:FieldModifier="internal" IsOn="True" OnContent="" OffContent="" MinWidth="0" />
+                        </controls:SettingsCard>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- TAB 2: NETWORK & SECURITY -->
+                <ScrollViewer x:Name="PageNetwork" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="6" Padding="0,0,8,12">
+                        <TextBlock
+                            x:Name="HeaderNetwork"
+                            Text="Rede &amp; Segurança"
+                            Style="{StaticResource TitleTextBlockStyle}"
+                            Margin="0,0,0,10" />
+
+                        <controls:SettingsCard x:Name="CardStreamName">
+                            <controls:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE8EC;" />
+                            </controls:SettingsCard.HeaderIcon>
+                            <TextBox x:Name="txtStreamName" x:FieldModifier="internal" Text="camera1" MinWidth="220" />
+                        </controls:SettingsCard>
+
+                        <controls:SettingsCard x:Name="CardPort">
+                            <controls:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE968;" />
+                            </controls:SettingsCard.HeaderIcon>
+                            <TextBox x:Name="txtPort" x:FieldModifier="internal" Text="8554" MinWidth="220" />
+                        </controls:SettingsCard>
+
+                        <controls:SettingsExpander x:Name="ExpanderAuth" IsExpanded="True">
+                            <controls:SettingsExpander.HeaderIcon>
+                                <FontIcon Glyph="&#xE72E;" />
+                            </controls:SettingsExpander.HeaderIcon>
+                            <ToggleSwitch x:Name="chkAuth" x:FieldModifier="internal" IsOn="False" OnContent="" OffContent="" MinWidth="0" />
+                            <controls:SettingsExpander.Items>
+                                <controls:SettingsCard x:Name="CardUsername">
+                                    <TextBox x:Name="txtUsername" x:FieldModifier="internal" Text="admin" MinWidth="220" />
+                                </controls:SettingsCard>
+                                <controls:SettingsCard x:Name="CardPassword">
+                                    <PasswordBox x:Name="txtPassword" x:FieldModifier="internal" MinWidth="220" />
+                                </controls:SettingsCard>
+                            </controls:SettingsExpander.Items>
+                        </controls:SettingsExpander>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- TAB 3: AUTOMATION -->
+                <ScrollViewer x:Name="PageAutomation" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="6" Padding="0,0,8,12">
+                        <TextBlock
+                            x:Name="HeaderAutomation"
+                            Text="Automação"
+                            Style="{StaticResource TitleTextBlockStyle}"
+                            Margin="0,0,0,10" />
+
+                        <controls:SettingsCard x:Name="CardStartWindows">
+                            <controls:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE7E8;" />
+                            </controls:SettingsCard.HeaderIcon>
+                            <ToggleSwitch x:Name="chkStartWithWindows" x:FieldModifier="internal" OnContent="" OffContent="" MinWidth="0" />
+                        </controls:SettingsCard>
+
+                        <controls:SettingsExpander x:Name="ExpanderSchedule" IsExpanded="True">
+                            <controls:SettingsExpander.HeaderIcon>
+                                <FontIcon Glyph="&#xE823;" />
+                            </controls:SettingsExpander.HeaderIcon>
+                            <ToggleSwitch x:Name="chkSchedule" x:FieldModifier="internal" OnContent="" OffContent="" MinWidth="0" />
+                            <controls:SettingsExpander.Items>
+                                <controls:SettingsCard x:Name="CardScheduleStart">
+                                    <TimePicker x:Name="tpScheduleStart" x:FieldModifier="internal" ClockIdentifier="24HourClock" Time="05:45:00" />
+                                </controls:SettingsCard>
+                                <controls:SettingsCard x:Name="CardScheduleEnd">
+                                    <TimePicker x:Name="tpScheduleEnd" x:FieldModifier="internal" ClockIdentifier="24HourClock" Time="22:15:00" />
+                                </controls:SettingsCard>
+                            </controls:SettingsExpander.Items>
+                        </controls:SettingsExpander>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- TAB 4: SETTINGS -->
+                <ScrollViewer x:Name="PageConfig" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="6" Padding="0,0,8,12">
+                        <TextBlock
+                            x:Name="HeaderConfig"
+                            Text="Configurações"
+                            Style="{StaticResource TitleTextBlockStyle}"
+                            Margin="0,0,0,10" />
+
+                        <controls:SettingsCard x:Name="CardLanguage">
+                            <controls:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xF2B7;" />
+                            </controls:SettingsCard.HeaderIcon>
+                            <ComboBox x:Name="cmbLanguage" x:FieldModifier="internal" MinWidth="220" />
+                        </controls:SettingsCard>
+
+                        <controls:SettingsCard x:Name="CardTheme">
+                            <controls:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE790;" />
+                            </controls:SettingsCard.HeaderIcon>
+                            <ComboBox x:Name="cmbTheme" x:FieldModifier="internal" MinWidth="220" />
+                        </controls:SettingsCard>
+
+                        <controls:SettingsExpander x:Name="ExpanderWebServer" IsExpanded="True">
+                            <controls:SettingsExpander.HeaderIcon>
+                                <FontIcon Glyph="&#xE774;" />
+                            </controls:SettingsExpander.HeaderIcon>
+                            <ToggleSwitch x:Name="chkWebServer" x:FieldModifier="internal" OnContent="" OffContent="" MinWidth="0" />
+                            <controls:SettingsExpander.Items>
+                                <controls:SettingsCard x:Name="CardWebPort">
+                                    <TextBox x:Name="txtWebPort" x:FieldModifier="internal" Text="8889" MinWidth="180" />
+                                </controls:SettingsCard>
+                                <controls:SettingsCard x:Name="CardWebAction">
+                                    <controls:SettingsCard.Header>
+                                        <TextBlock x:Name="lblWebUrl" x:FieldModifier="internal" IsTextSelectionEnabled="True" FontFamily="Consolas" />
+                                    </controls:SettingsCard.Header>
+                                    <Button x:Name="btnCopyWeb" x:FieldModifier="internal" Visibility="Collapsed">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon Glyph="&#xE8A7;" FontSize="14" />
+                                            <TextBlock x:Name="LblBtnOpenWeb" Text="Abrir Painel Web" />
+                                        </StackPanel>
+                                    </Button>
+                                </controls:SettingsCard>
+                            </controls:SettingsExpander.Items>
+                        </controls:SettingsExpander>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- TAB 5: LOGS -->
+                <Grid x:Name="PageLogs" Visibility="Collapsed" RowDefinitions="Auto,*">
+                    <Grid Grid.Row="0" Margin="0,0,0,10" ColumnDefinitions="*,Auto">
+                        <TextBlock
+                            Text="Logs"
+                            Style="{StaticResource TitleTextBlockStyle}"
+                            VerticalAlignment="Center" />
+                        <Button x:Name="BtnClearLogs" Grid.Column="1" Click="BtnClearLogs_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE74D;" FontSize="14" />
+                                <TextBlock Text="Limpar" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                    <Border
+                        Grid.Row="1"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="4">
+                        <TextBox
+                            x:Name="rtbLogs"
+                            x:FieldModifier="internal"
+                            IsReadOnly="True"
+                            AcceptsReturn="True"
+                            TextWrapping="Wrap"
+                            FontFamily="Cascadia Mono, Consolas"
+                            FontSize="12"
+                            BorderThickness="0"
+                            Background="Transparent"
+                            ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                    </Border>
+                </Grid>
+
+                <!-- TAB 6: ABOUT -->
+                <ScrollViewer x:Name="PageAbout" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="8" Padding="0,0,8,12">
+                        <TextBlock
+                            x:Name="HeaderAbout"
+                            Text="Sobre"
+                            Style="{StaticResource TitleTextBlockStyle}"
+                            Margin="0,0,0,10" />
+
+                        <!-- Hero App Card -->
+                        <Border
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="20">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="18">
+                                <Image
+                                    Grid.Column="0"
+                                    Source="ms-appx:///assets/icon.png"
+                                    Width="64"
+                                    Height="64"
+                                    VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                                    <TextBlock
+                                        x:Name="lblAboutTitle"
+                                        Text="Screen To RTSP"
+                                        Style="{StaticResource SubtitleTextBlockStyle}" />
+                                    <TextBlock
+                                        x:Name="lblAboutDesc"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Update Available InfoBar -->
+                        <InfoBar
+                            x:Name="InfoBarUpdate"
+                            IsOpen="False"
+                            IsClosable="False"
+                            Severity="Warning" />
+
+                        <!-- Versions Card -->
+                        <controls:SettingsCard x:Name="CardAppVersion">
+                            <controls:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE946;" />
+                            </controls:SettingsCard.HeaderIcon>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock x:Name="lblAboutVersion" FontWeight="SemiBold" />
+                                <TextBlock x:Name="lblAboutUpdate" Foreground="{ThemeResource SystemFillColorCriticalBrush}" FontWeight="Bold" />
+                            </StackPanel>
+                        </controls:SettingsCard>
+
+                        <controls:SettingsCard Header="FFmpeg">
+                            <controls:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE714;" />
+                            </controls:SettingsCard.HeaderIcon>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock x:Name="lblFFmpegVersion" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock x:Name="lblFFmpegUpdate" Foreground="{ThemeResource SystemFillColorCriticalBrush}" FontWeight="Bold" />
+                            </StackPanel>
+                        </controls:SettingsCard>
+
+                        <controls:SettingsCard Header="MediaMTX">
+                            <controls:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE968;" />
+                            </controls:SettingsCard.HeaderIcon>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock x:Name="lblMediaMTXVersion" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock x:Name="lblMediaMTXUpdate" Foreground="{ThemeResource SystemFillColorCriticalBrush}" FontWeight="Bold" />
+                            </StackPanel>
+                        </controls:SettingsCard>
+
+                        <!-- Update Action Buttons -->
+                        <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,8,0,0">
+                            <Button x:Name="btnCheckUpdates" Padding="16,8">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <ProgressRing x:Name="PrgCheckUpdates" Width="16" Height="16" IsActive="False" Visibility="Collapsed" />
+                                    <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                                    <TextBlock x:Name="LblBtnCheckUpdates" Text="Verificar Atualizações" />
+                                </StackPanel>
+                            </Button>
+
+                            <Button
+                                x:Name="btnUpdateBinaries"
+                                Visibility="Collapsed"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Padding="16,8">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE896;" FontSize="14" />
+                                    <TextBlock x:Name="LblBtnUpdateBinaries" Text="Instalar Atualizações" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </NavigationView>
+
+        <!-- Fixed Bottom Status & Action Bar -->
+        <Border
+            Grid.Row="2"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="0,1,0,0"
+            Padding="24,14">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                <!-- Left: Status + RTSP Links + Copy Buttons -->
+                <StackPanel Grid.Column="0" Spacing="6" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <Ellipse
+                            x:Name="StatusDot"
+                            Width="10"
+                            Height="10"
+                            Fill="#E11D48"
+                            VerticalAlignment="Center" />
+                        <TextBlock
+                            x:Name="lblStatus"
+                            Text="Status: Aguardando"
+                            FontWeight="SemiBold"
+                            FontSize="14"
+                            VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <TextBlock
+                        x:Name="lblUrl"
+                        Text="Os links da câmera aparecerão aqui."
+                        FontSize="12"
+                        FontFamily="Consolas"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        IsTextSelectionEnabled="True"
+                        TextWrapping="Wrap" />
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="btnCopyLan" Visibility="Collapsed" Padding="10,4" FontSize="12">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE8C8;" FontSize="12" />
+                                <TextBlock x:Name="LblBtnCopyLan" Text="Copiar Link Principal" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="btnCopyLocal" Visibility="Collapsed" Padding="10,4" FontSize="12">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE8C8;" FontSize="12" />
+                                <TextBlock x:Name="LblBtnCopyLocal" Text="Copiar Link Leve" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Right: Start / Stop Primary Button -->
+                <Button
+                    x:Name="btnStart"
+                    Grid.Column="1"
+                    Style="{StaticResource AccentButtonStyle}"
+                    MinWidth="200"
+                    Height="44"
+                    FontWeight="SemiBold"
+                    FontSize="14"
+                    VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon x:Name="IconBtnStart" Glyph="&#xE768;" FontSize="14" />
+                        <TextBlock x:Name="LblBtnStart" Text="Iniciar Transmissão" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
