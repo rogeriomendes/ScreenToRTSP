@@ -11,6 +11,7 @@ namespace ScreenToRTSP.UI
     public class WebPanel
     {
         private Main form;
+        private static byte[] _cachedIconBytes;
 
         public WebPanel(Main form)
         {
@@ -149,14 +150,23 @@ namespace ScreenToRTSP.UI
                             {
                                 try
                                 {
-                                    using (var stream = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("ScreenToRTSP.assets.icon.png"))
+                                    if (_cachedIconBytes == null)
                                     {
-                                        if (stream != null)
+                                        using (var stream = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("ScreenToRTSP.assets.icon.png"))
                                         {
-                                            response.ContentType = "image/png";
-                                            response.ContentLength64 = stream.Length;
-                                            stream.CopyTo(response.OutputStream);
+                                            if (stream != null)
+                                            {
+                                                using var ms = new MemoryStream((int)stream.Length);
+                                                stream.CopyTo(ms);
+                                                _cachedIconBytes = ms.ToArray();
+                                            }
                                         }
+                                    }
+                                    if (_cachedIconBytes != null)
+                                    {
+                                        response.ContentType = "image/png";
+                                        response.ContentLength64 = _cachedIconBytes.Length;
+                                        response.OutputStream.Write(_cachedIconBytes, 0, _cachedIconBytes.Length);
                                     }
                                 }
                                 catch { }
@@ -166,9 +176,7 @@ namespace ScreenToRTSP.UI
 
                             if (request.Url.AbsolutePath == "/status")
                             {
-                                string st = "";
-                                form.InvokeSafe(() => st = form.isTransmitting.ToString().ToLower());
-                                byte[] sBuf = Encoding.UTF8.GetBytes(st);
+                                byte[] sBuf = Encoding.UTF8.GetBytes(form.isTransmitting ? "true" : "false");
                                 response.ContentType = "text/plain";
                                 response.ContentLength64 = sBuf.Length;
                                 response.OutputStream.Write(sBuf, 0, sBuf.Length);
@@ -178,11 +186,7 @@ namespace ScreenToRTSP.UI
 
                             if (request.Url.AbsolutePath == "/logs")
                             {
-                                string logs = "";
-                                form.InvokeSafe(() =>
-                                {
-                                    if (form.rtbLogs != null) logs = form.rtbLogs.Text;
-                                });
+                                string logs = form.LogWriter?.GetSnapshot() ?? "";
                                 byte[] sBuf = Encoding.UTF8.GetBytes(logs);
                                 response.ContentType = "text/plain";
                                 response.ContentLength64 = sBuf.Length;
@@ -218,79 +222,87 @@ namespace ScreenToRTSP.UI
                                         }
                                     }
 
-                                    form.InvokeSafe(() =>
+                                    if (action == "update")
                                     {
-                                        if (action == "start") form.StartClick();
-                                        else if (action == "stop") form.StopClick();
-                                        else if (action == "save")
+                                        bool wasTransmitting = false;
+                                        form.InvokeSafe(() =>
                                         {
-                                            bool wasTransmitting = form.isTransmitting;
+                                            wasTransmitting = form.isTransmitting;
                                             if (wasTransmitting) form.StopClick();
+                                        });
 
-                                            form.isLoading = true;
-                                            try
-                                            {
-                                                if (p.ContainsKey("port")) form.txtPort.Text = p["port"];
-                                                if (p.ContainsKey("stream")) form.txtStreamName.Text = p["stream"];
-                                                form.chkAuth.IsOn = p.ContainsKey("auth");
-                                                if (p.ContainsKey("user")) form.txtUsername.Text = p["user"];
-                                                if (p.ContainsKey("pass") && !string.IsNullOrEmpty(p["pass"])) form.txtPassword.Password = p["pass"];
-                                                if (p.ContainsKey("monitor")) form.cmbMonitor.SelectedIndex = int.Parse(p["monitor"]);
-                                                if (p.ContainsKey("encoder")) form.cmbEncoder.SelectedIndex = int.Parse(p["encoder"]);
-                                                if (p.ContainsKey("quality")) form.cmbQuality.SelectedIndex = int.Parse(p["quality"]);
-                                                if (p.ContainsKey("fps"))
-                                                {
-                                                    int fIdx = form.cmbFps.Items.IndexOf(p["fps"]);
-                                                    if (fIdx >= 0) form.cmbFps.SelectedIndex = fIdx;
-                                                }
-                                                form.chkDualStream.IsOn = p.ContainsKey("dual");
-                                                form.chkMouseCursor.IsOn = p.ContainsKey("mouse");
-                                                form.chkSchedule.IsOn = p.ContainsKey("sched");
-                                                if (p.ContainsKey("sched_s")) form.ScheduleStartText = p["sched_s"];
-                                                if (p.ContainsKey("sched_e")) form.ScheduleEndText = p["sched_e"];
-                                                form.chkStartWithWindows.IsOn = p.ContainsKey("startwin");
-                                                form.ToggleStartWithWindows();
+                                        DependencyManager.CheckAndDownloadDependencies(true);
+                                        DependencyManager.CheckForNewVersionsAsync().GetAwaiter().GetResult();
 
-                                                if (p.ContainsKey("lang"))
-                                                {
-                                                    int langIdx = int.Parse(p["lang"]);
-                                                    form.cmbLanguage.SelectedIndex = langIdx;
-                                                    var keys = LanguageManager.GetLanguageKeys();
-                                                    if (langIdx >= 0 && langIdx < keys.Count)
-                                                        LanguageManager.ApplyLanguage(keys[langIdx]);
-                                                }
-
-                                                if (p.ContainsKey("theme"))
-                                                {
-                                                    int themeIdx = int.Parse(p["theme"]);
-                                                    form.cmbTheme.SelectedIndex = themeIdx;
-                                                    string newTheme = themeIdx == 1 ? "Dark" : (themeIdx == 2 ? "Light" : "System");
-                                                    form.ApplyTheme(newTheme);
-                                                }
-                                            }
-                                            finally
-                                            {
-                                                form.isLoading = false;
-                                            }
-
-                                            form.TriggerSave();
-                                            form.UpdateUrlStatus();
-                                            if (wasTransmitting) form.StartClick();
-                                        }
-                                        else if (action == "update")
+                                        if (wasTransmitting)
                                         {
-                                            bool wasTransmitting = form.isTransmitting;
-                                            if (wasTransmitting) form.StopClick();
-
-                                            DependencyManager.CheckAndDownloadDependencies(true);
-                                            DependencyManager.CheckForNewVersionsAsync().GetAwaiter().GetResult();
-
-                                            if (wasTransmitting) form.StartClick();
-
-                                            action = "updated";
-                                            return;
+                                            form.InvokeSafe(() => form.StartClick());
                                         }
-                                    });
+                                        action = "updated";
+                                    }
+                                    else
+                                    {
+                                        form.InvokeSafe(() =>
+                                        {
+                                            if (action == "start") form.StartClick();
+                                            else if (action == "stop") form.StopClick();
+                                            else if (action == "save")
+                                            {
+                                                bool wasTransmitting = form.isTransmitting;
+                                                if (wasTransmitting) form.StopClick();
+
+                                                form.isLoading = true;
+                                                try
+                                                {
+                                                    if (p.ContainsKey("port")) form.txtPort.Text = p["port"];
+                                                    if (p.ContainsKey("stream")) form.txtStreamName.Text = p["stream"];
+                                                    form.chkAuth.IsOn = p.ContainsKey("auth");
+                                                    if (p.ContainsKey("user")) form.txtUsername.Text = p["user"];
+                                                    if (p.ContainsKey("pass") && !string.IsNullOrEmpty(p["pass"])) form.txtPassword.Password = p["pass"];
+                                                    if (p.ContainsKey("monitor")) form.cmbMonitor.SelectedIndex = int.Parse(p["monitor"]);
+                                                    if (p.ContainsKey("encoder")) form.cmbEncoder.SelectedIndex = int.Parse(p["encoder"]);
+                                                    if (p.ContainsKey("quality")) form.cmbQuality.SelectedIndex = int.Parse(p["quality"]);
+                                                    if (p.ContainsKey("fps"))
+                                                    {
+                                                        int fIdx = form.cmbFps.Items.IndexOf(p["fps"]);
+                                                        if (fIdx >= 0) form.cmbFps.SelectedIndex = fIdx;
+                                                    }
+                                                    form.chkDualStream.IsOn = p.ContainsKey("dual");
+                                                    form.chkMouseCursor.IsOn = p.ContainsKey("mouse");
+                                                    form.chkSchedule.IsOn = p.ContainsKey("sched");
+                                                    if (p.ContainsKey("sched_s")) form.ScheduleStartText = p["sched_s"];
+                                                    if (p.ContainsKey("sched_e")) form.ScheduleEndText = p["sched_e"];
+                                                    form.chkStartWithWindows.IsOn = p.ContainsKey("startwin");
+                                                    form.ToggleStartWithWindows();
+
+                                                    if (p.ContainsKey("lang"))
+                                                    {
+                                                        int langIdx = int.Parse(p["lang"]);
+                                                        form.cmbLanguage.SelectedIndex = langIdx;
+                                                        var keys = LanguageManager.GetLanguageKeys();
+                                                        if (langIdx >= 0 && langIdx < keys.Count)
+                                                            LanguageManager.ApplyLanguage(keys[langIdx]);
+                                                    }
+
+                                                    if (p.ContainsKey("theme"))
+                                                    {
+                                                        int themeIdx = int.Parse(p["theme"]);
+                                                        form.cmbTheme.SelectedIndex = themeIdx;
+                                                        string newTheme = themeIdx == 1 ? "Dark" : (themeIdx == 2 ? "Light" : "System");
+                                                        form.ApplyTheme(newTheme);
+                                                    }
+                                                }
+                                                finally
+                                                {
+                                                    form.isLoading = false;
+                                                }
+
+                                                form.TriggerSave();
+                                                form.UpdateUrlStatus();
+                                                if (wasTransmitting) form.StartClick();
+                                            }
+                                        });
+                                    }
                                 }
 
                                 if (action == "save") response.Redirect("/?saved=1");
@@ -338,99 +350,128 @@ namespace ScreenToRTSP.UI
                                 successMsg = $"<div id='successMsg' style='background-color:#fee2e2; color:#991b1b; padding:10px; margin-bottom:15px; border-radius:5px; text-align:center; border:1px solid #fecaca;'><b>{LanguageManager.Get("MsgCheckUpdateError")}</b></div><script>setTimeout(function(){{ var el = document.getElementById('successMsg'); if(el) el.style.display='none'; }}, 4000);</script>";
                             }
 
-                            string html = "";
+                            bool isTransmitting = false;
+                            int monitorIdx = 0, monitorCount = 1, encoderIdx = 0, qualityIdx = 1, langIdx = 0;
+                            string selectedFps = "30", lanUrl = "", lanLowUrl = "", streamName = "", portText = "", userText = "", schedStart = "", schedEnd = "";
+                            bool dualOn = false, mouseOn = true, authOn = false, startWinOn = false, schedOn = false;
+                            var fpsItems = new System.Collections.Generic.List<string>();
+                            var langItems = new System.Collections.Generic.List<string>();
+
                             form.InvokeSafe(() =>
                             {
-                                string status = form.isTransmitting
-                                    ? $"<b style='color:green'>● {LanguageManager.Get("StatusPrefix")}{LanguageManager.Get("StatusRunning")}</b>"
-                                    : $"<b style='color:red'>● {LanguageManager.Get("StatusPrefix")}{LanguageManager.Get("StatusStopped")}</b>";
-                                string chk(bool b) => b ? "checked" : "";
-                                string sel(int idx, int match) => idx == match ? "selected" : "";
+                                isTransmitting = form.isTransmitting;
+                                monitorIdx = form.cmbMonitor.SelectedIndex;
+                                monitorCount = form.cmbMonitor.Items.Count;
+                                selectedFps = form.cmbFps.SelectedItem?.ToString() ?? "30";
+                                foreach (var fOpt in form.cmbFps.Items) fpsItems.Add(fOpt.ToString() ?? "");
+                                langIdx = form.cmbLanguage.SelectedIndex;
+                                foreach (var lOpt in form.cmbLanguage.Items) langItems.Add(lOpt.ToString() ?? "");
+                                encoderIdx = form.cmbEncoder.SelectedIndex;
+                                qualityIdx = form.cmbQuality.SelectedIndex;
+                                dualOn = form.chkDualStream.IsOn;
+                                mouseOn = form.chkMouseCursor.IsOn;
+                                authOn = form.chkAuth.IsOn;
+                                startWinOn = form.chkStartWithWindows.IsOn;
+                                schedOn = form.chkSchedule.IsOn;
+                                lanUrl = form.currentLanUrl;
+                                lanLowUrl = form.currentLanLowUrl;
+                                streamName = form.txtStreamName.Text;
+                                portText = form.txtPort.Text;
+                                userText = form.txtUsername.Text;
+                                schedStart = form.ScheduleStartText;
+                                schedEnd = form.ScheduleEndText;
+                            });
 
-                                string monitorOptions = $"<option value='0' {sel(form.cmbMonitor.SelectedIndex, 0)}>{LanguageManager.Get("AllMonitors")}</option>";
-                                for (int i = 1; i < form.cmbMonitor.Items.Count; i++)
-                                    monitorOptions += $"<option value='{i}' {sel(form.cmbMonitor.SelectedIndex, i)}>{LanguageManager.Get("MonitorPrefix")} {i}</option>";
+                            string status = isTransmitting
+                                ? $"<b style='color:green'>● {LanguageManager.Get("StatusPrefix")}{LanguageManager.Get("StatusRunning")}</b>"
+                                : $"<b style='color:red'>● {LanguageManager.Get("StatusPrefix")}{LanguageManager.Get("StatusStopped")}</b>";
+                            string chk(bool b) => b ? "checked" : "";
+                            string sel(int idx, int match) => idx == match ? "selected" : "";
 
-                                string fpsOptions = "";
-                                foreach (var fOpt in form.cmbFps.Items)
-                                    fpsOptions += $"<option value='{fOpt}' {(form.cmbFps.SelectedItem?.ToString() == fOpt.ToString() ? "selected" : "")}>{fOpt}</option>";
+                            string monitorOptions = $"<option value='0' {sel(monitorIdx, 0)}>{LanguageManager.Get("AllMonitors")}</option>";
+                            for (int i = 1; i < monitorCount; i++)
+                                monitorOptions += $"<option value='{i}' {sel(monitorIdx, i)}>{LanguageManager.Get("MonitorPrefix")} {i}</option>";
 
-                                string langOptions = "";
-                                for (int i = 0; i < form.cmbLanguage.Items.Count; i++)
-                                    langOptions += $"<option value='{i}' {sel(form.cmbLanguage.SelectedIndex, i)}>{form.cmbLanguage.Items[i]}</option>";
+                            string fpsOptions = "";
+                            foreach (var fOpt in fpsItems)
+                                fpsOptions += $"<option value='{fOpt}' {(selectedFps == fOpt ? "selected" : "")}>{fOpt}</option>";
 
-                                var cCfg = form.configManager.Load();
-                                string curThemeStr = cCfg.ContainsKey("Theme") ? cCfg["Theme"] : "System";
-                                int curThemeIdx = curThemeStr == "Dark" ? 1 : (curThemeStr == "Light" ? 2 : 0);
-                                string themeOptions = $"<option value='0' {sel(curThemeIdx, 0)}>{LanguageManager.Get("ThemeSystem")}</option>";
-                                themeOptions += $"<option value='1' {sel(curThemeIdx, 1)}>{LanguageManager.Get("ThemeDark")}</option>";
-                                themeOptions += $"<option value='2' {sel(curThemeIdx, 2)}>{LanguageManager.Get("ThemeLight")}</option>";
+                            string langOptions = "";
+                            for (int i = 0; i < langItems.Count; i++)
+                                langOptions += $"<option value='{i}' {sel(langIdx, i)}>{langItems[i]}</option>";
 
-                                string btnAction = form.isTransmitting ? "stop" : "start";
-                                string btnText = form.isTransmitting ? "■ " + LanguageManager.Get("BtnStop") : "▶ " + LanguageManager.Get("BtnStart");
-                                string btnClass = form.isTransmitting ? "btn-stop" : "btn-start";
+                            var cCfg = form.configManager.Load();
+                            string curThemeStr = cCfg.ContainsKey("Theme") ? cCfg["Theme"] : "System";
+                            int curThemeIdx = curThemeStr == "Dark" ? 1 : (curThemeStr == "Light" ? 2 : 0);
+                            string themeOptions = $"<option value='0' {sel(curThemeIdx, 0)}>{LanguageManager.Get("ThemeSystem")}</option>";
+                            themeOptions += $"<option value='1' {sel(curThemeIdx, 1)}>{LanguageManager.Get("ThemeDark")}</option>";
+                            themeOptions += $"<option value='2' {sel(curThemeIdx, 2)}>{LanguageManager.Get("ThemeLight")}</option>";
 
-                                string linksHtml = "";
-                                if (form.isTransmitting)
+                            string btnAction = isTransmitting ? "stop" : "start";
+                            string btnText = isTransmitting ? "■ " + LanguageManager.Get("BtnStop") : "▶ " + LanguageManager.Get("BtnStart");
+                            string btnClass = isTransmitting ? "btn-stop" : "btn-start";
+
+                            string linksHtml = "";
+                            if (isTransmitting)
+                            {
+                                linksHtml += $@"<div class='links-card' style='text-align:left; font-size:14px; margin-top:15px; padding:10px; border-radius:5px;'>
+                                    <b>Principal:</b> <a href='{lanUrl}' style='color:#3b82f6; text-decoration:none;'>{lanUrl}</a><br>";
+                                if (dualOn)
                                 {
-                                    linksHtml += $@"<div class='links-card' style='text-align:left; font-size:14px; margin-top:15px; padding:10px; border-radius:5px;'>
-                                        <b>Principal:</b> <a href='{form.currentLanUrl}' style='color:#3b82f6; text-decoration:none;'>{form.currentLanUrl}</a><br>";
-                                    if (form.chkDualStream.IsOn)
-                                    {
-                                        linksHtml += $"<b>Leve:</b> <a href='{form.currentLanLowUrl}' style='color:#3b82f6; text-decoration:none;'>{form.currentLanLowUrl}</a>";
-                                    }
-                                    linksHtml += "</div>";
-
-                                    if (form.chkDualStream.IsOn)
-                                    {
-                                        linksHtml += $@"<div class='flex' style='margin-top:10px;'>
-                                            <div><button type='button' class='btn-outline' style='font-size:14px; margin-bottom:0; padding:10px 5px;' onclick=""copyText('{form.currentLanUrl}')"">📋 {LanguageManager.Get("BtnCopyLan")}</button></div>
-                                            <div><button type='button' class='btn-outline' style='font-size:14px; margin-bottom:0; padding:10px 5px;' onclick=""copyText('{form.currentLanLowUrl}')"">📋 {LanguageManager.Get("BtnCopyLocal")}</button></div>
-                                        </div>";
-                                    }
-                                    else
-                                    {
-                                        linksHtml += $@"<div style='margin-top:10px;'>
-                                            <button type='button' class='btn-outline' style='font-size:14px; margin-bottom:0;' onclick=""copyText('{form.currentLanUrl}')"">📋 {LanguageManager.Get("BtnCopyLan")}</button>
-                                        </div>";
-                                    }
+                                    linksHtml += $"<b>Leve:</b> <a href='{lanLowUrl}' style='color:#3b82f6; text-decoration:none;'>{lanLowUrl}</a>";
                                 }
+                                linksHtml += "</div>";
 
-                                string updateHtml = "";
-                                if (DependencyManager.HasUpdateAvailable)
+                                if (dualOn)
                                 {
-                                    string lblMsg = LanguageManager.Get("UpdateAvailable");
-                                    updateHtml += $@"
-                                        <div style='margin-top:15px; padding:10px; border:1px solid #fecaca; background:#fee2e2; border-radius:8px;'>
-                                            <p style='color:#dc2626; font-weight:bold; font-size:14px; margin:0;'>{lblMsg}</p>
-                                        </div>";
+                                    linksHtml += $@"<div class='flex' style='margin-top:10px;'>
+                                        <div><button type='button' class='btn-outline' style='font-size:14px; margin-bottom:0; padding:10px 5px;' onclick=""copyText('{lanUrl}')"">📋 {LanguageManager.Get("BtnCopyLan")}</button></div>
+                                        <div><button type='button' class='btn-outline' style='font-size:14px; margin-bottom:0; padding:10px 5px;' onclick=""copyText('{lanLowUrl}')"">📋 {LanguageManager.Get("BtnCopyLocal")}</button></div>
+                                    </div>";
                                 }
+                                else
+                                {
+                                    linksHtml += $@"<div style='margin-top:10px;'>
+                                        <button type='button' class='btn-outline' style='font-size:14px; margin-bottom:0;' onclick=""copyText('{lanUrl}')"">📋 {LanguageManager.Get("BtnCopyLan")}</button>
+                                    </div>";
+                                }
+                            }
 
-                                string updateBtn = DependencyManager.HasUpdateAvailable
-                                    ? $@"<button type='button' style='background:#16a34a; margin:0; padding:8px; font-size:14px;' onclick=""if(Main_isTransmitting) {{ if(confirm('{LanguageManager.Get("MsgStopBeforeUpdate")}')) submitAction('update'); }} else {{ submitAction('update'); }}"">{LanguageManager.Get("BtnUpdateBinaries")}</button>"
-                                    : "";
-
+                            string updateHtml = "";
+                            if (DependencyManager.HasUpdateAvailable)
+                            {
+                                string lblMsg = LanguageManager.Get("UpdateAvailable");
                                 updateHtml += $@"
-                                        <div class='flex' style='margin-top:15px;'>
-                                            <div><button type='button' style='background:#3b82f6; margin:0; padding:8px; font-size:14px;' onclick=""submitAction('check')"">{LanguageManager.Get("BtnCheckUpdates")}</button></div>
-                                            <div>{updateBtn}</div>
-                                        </div>";
+                                    <div style='margin-top:15px; padding:10px; border:1px solid #fecaca; background:#fee2e2; border-radius:8px;'>
+                                        <p style='color:#dc2626; font-weight:bold; font-size:14px; margin:0;'>{lblMsg}</p>
+                                    </div>";
+                            }
 
-                                string appVer = Updater.GetAppVersion();
-                                string ffText = "FFmpeg " + LanguageManager.Get("AboutVersion") + DependencyManager.GetFFmpegVersion();
-                                if (DependencyManager.HasFfmpegUpdate) ffText += " <span style='color:#dc2626; font-weight:bold;'>(" + LanguageManager.Get("NewVersion") + DependencyManager.FfmpegLatestVersionStr + ")</span>";
-                                string mtxText = "MediaMTX " + LanguageManager.Get("AboutVersion") + DependencyManager.GetMediaMTXVersion();
-                                if (DependencyManager.HasMtxUpdate) mtxText += " <span style='color:#dc2626; font-weight:bold;'>(" + LanguageManager.Get("NewVersion") + DependencyManager.MtxLatestVersionStr + ")</span>";
+                            string updateBtn = DependencyManager.HasUpdateAvailable
+                                ? $@"<button type='button' style='background:#16a34a; margin:0; padding:8px; font-size:14px;' onclick=""if(Main_isTransmitting) {{ if(confirm('{LanguageManager.Get("MsgStopBeforeUpdate")}')) submitAction('update'); }} else {{ submitAction('update'); }}"">{LanguageManager.Get("BtnUpdateBinaries")}</button>"
+                                : "";
 
-                                string versionsHtml = $@"
-                                    <div class='info-card' style='margin-top:15px; padding:10px; border-radius:8px; font-size:13px;'>
-                                        <strong>{LanguageManager.Get("AboutVersion")}{appVer}</strong><br/>
-                                        {ffText}<br/>
-                                        {mtxText}
-                                    </div>
-                                ";
+                            updateHtml += $@"
+                                    <div class='flex' style='margin-top:15px;'>
+                                        <div><button type='button' style='background:#3b82f6; margin:0; padding:8px; font-size:14px;' onclick=""submitAction('check')"">{LanguageManager.Get("BtnCheckUpdates")}</button></div>
+                                        <div>{updateBtn}</div>
+                                    </div>";
 
-                                html = $@"<!DOCTYPE html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>
+                            string appVer = Updater.GetAppVersion();
+                            string ffText = "FFmpeg " + LanguageManager.Get("AboutVersion") + DependencyManager.GetFFmpegVersion();
+                            if (DependencyManager.HasFfmpegUpdate) ffText += " <span style='color:#dc2626; font-weight:bold;'>(" + LanguageManager.Get("NewVersion") + DependencyManager.FfmpegLatestVersionStr + ")</span>";
+                            string mtxText = "MediaMTX " + LanguageManager.Get("AboutVersion") + DependencyManager.GetMediaMTXVersion();
+                            if (DependencyManager.HasMtxUpdate) mtxText += " <span style='color:#dc2626; font-weight:bold;'>(" + LanguageManager.Get("NewVersion") + DependencyManager.MtxLatestVersionStr + ")</span>";
+
+                            string versionsHtml = $@"
+                                <div class='info-card' style='margin-top:15px; padding:10px; border-radius:8px; font-size:13px;'>
+                                    <strong>{LanguageManager.Get("AboutVersion")}{appVer}</strong><br/>
+                                    {ffText}<br/>
+                                    {mtxText}
+                                </div>
+                            ";
+
+                            string html = $@"<!DOCTYPE html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>
                                 <link rel='icon' type='image/png' href=""/icon.png"">
                                 <title>{LanguageManager.Get("AppTitle")}</title>
                                 <style>
@@ -480,8 +521,8 @@ namespace ScreenToRTSP.UI
                                     }}
                                 </style>
                                 <script>
-                                    var Main_isTransmitting = {(form.isTransmitting ? "true" : "false")};
-                                    let currentState = '{form.isTransmitting.ToString().ToLower()}';
+                                    var Main_isTransmitting = {(isTransmitting ? "true" : "false")};
+                                    let currentState = '{isTransmitting.ToString().ToLower()}';
                                     
                                     document.addEventListener('DOMContentLoaded', function() {{
                                         var themeSelect = document.querySelector('select[name=""theme""]');
@@ -528,7 +569,7 @@ namespace ScreenToRTSP.UI
                                         <input type='hidden' name='action' value='{btnAction}'/>
                                         <button class='{btnClass}' style='margin:0;'>{btnText}</button>
                                     </form>
-                                    {(form.isTransmitting ? $"<button type='button' class='btn-outline' onclick=\"showPreview()\" style='flex:1; margin:0;'>📺 {LanguageManager.Get("TabPreview")}</button>" : "")} 
+                                    {(isTransmitting ? $"<button type='button' class='btn-outline' onclick=\"showPreview()\" style='flex:1; margin:0;'>📺 {LanguageManager.Get("TabPreview")}</button>" : "")} 
                                 </div>
                                 
                                 <hr>
@@ -553,39 +594,39 @@ namespace ScreenToRTSP.UI
                                     </div>
                                     <div class='flex'>
                                         <div><label title='{LanguageManager.Get("TipEncoder")}'>{LanguageManager.Get("EncoderLabel")}</label><br><select name='encoder' title='{LanguageManager.Get("TipEncoder")}'>
-                                            <option value='0' {sel(form.cmbEncoder.SelectedIndex, 0)}>{LanguageManager.Get("EncoderCPU")}</option>
-                                            <option value='1' {sel(form.cmbEncoder.SelectedIndex, 1)}>{LanguageManager.Get("EncoderNVENC")}</option>
-                                            <option value='2' {sel(form.cmbEncoder.SelectedIndex, 2)}>{LanguageManager.Get("EncoderQSV")}</option>
+                                            <option value='0' {sel(encoderIdx, 0)}>{LanguageManager.Get("EncoderCPU")}</option>
+                                            <option value='1' {sel(encoderIdx, 1)}>{LanguageManager.Get("EncoderNVENC")}</option>
+                                            <option value='2' {sel(encoderIdx, 2)}>{LanguageManager.Get("EncoderQSV")}</option>
                                         </select></div>
                                         <div><label title='{LanguageManager.Get("TipQuality")}'>{LanguageManager.Get("QualityLabel")}</label><br><select name='quality' title='{LanguageManager.Get("TipQuality")}'>
-                                            <option value='0' {sel(form.cmbQuality.SelectedIndex, 0)}>{LanguageManager.Get("QualityLow")}</option>
-                                            <option value='1' {sel(form.cmbQuality.SelectedIndex, 1)}>{LanguageManager.Get("QualityMedium")}</option>
-                                            <option value='2' {sel(form.cmbQuality.SelectedIndex, 2)}>{LanguageManager.Get("QualityHigh")}</option>
+                                            <option value='0' {sel(qualityIdx, 0)}>{LanguageManager.Get("QualityLow")}</option>
+                                            <option value='1' {sel(qualityIdx, 1)}>{LanguageManager.Get("QualityMedium")}</option>
+                                            <option value='2' {sel(qualityIdx, 2)}>{LanguageManager.Get("QualityHigh")}</option>
                                         </select></div>
                                     </div>
-                                    <label title='{LanguageManager.Get("TipDualStream")}'><input type='checkbox' name='dual' value='1' {chk(form.chkDualStream.IsOn)}> {LanguageManager.Get("DualStreamLabel")}</label><br><br>
-                                    <label title='{LanguageManager.Get("TipMouseCursor")}'><input type='checkbox' name='mouse' value='1' {chk(form.chkMouseCursor.IsOn)}> {LanguageManager.Get("MouseCursorLabel")}</label><br>
+                                    <label title='{LanguageManager.Get("TipDualStream")}'><input type='checkbox' name='dual' value='1' {chk(dualOn)}> {LanguageManager.Get("DualStreamLabel")}</label><br><br>
+                                    <label title='{LanguageManager.Get("TipMouseCursor")}'><input type='checkbox' name='mouse' value='1' {chk(mouseOn)}> {LanguageManager.Get("MouseCursorLabel")}</label><br>
                                 </div>
 
                                 <div id='tab-rede' class='tabcontent'>
                                     <div class='flex'>
-                                        <div><label>{LanguageManager.Get("StreamNameLabel")}</label><br><input type='text' name='stream' value='{form.txtStreamName.Text}'></div>
-                                        <div><label>{LanguageManager.Get("PortLabel")}</label><br><input type='text' name='port' value='{form.txtPort.Text}'></div>
+                                        <div><label>{LanguageManager.Get("StreamNameLabel")}</label><br><input type='text' name='stream' value='{streamName}'></div>
+                                        <div><label>{LanguageManager.Get("PortLabel")}</label><br><input type='text' name='port' value='{portText}'></div>
                                     </div>
 
-                                    <label><input type='checkbox' name='auth' value='1' {chk(form.chkAuth.IsOn)}> <b>{LanguageManager.Get("AuthLabel")}</b></label><br><br>
+                                    <label><input type='checkbox' name='auth' value='1' {chk(authOn)}> <b>{LanguageManager.Get("AuthLabel")}</b></label><br><br>
                                     <div class='flex'>
-                                        <div><label>{LanguageManager.Get("UserLabel")}</label><br><input type='text' name='user' value='{form.txtUsername.Text}'></div>
+                                        <div><label>{LanguageManager.Get("UserLabel")}</label><br><input type='text' name='user' value='{userText}'></div>
                                         <div><label>{LanguageManager.Get("PasswordLabel")}</label><br><input type='password' name='pass' placeholder='{LanguageManager.Get("PassPlaceholder")}'></div>
                                     </div>
                                 </div>
 
                                 <div id='tab-auto' class='tabcontent'>
-                                    <label title='{LanguageManager.Get("TipStartWindows")}'><input type='checkbox' name='startwin' value='1' {chk(form.chkStartWithWindows.IsOn)}> {LanguageManager.Get("StartWindowsLabel")}</label><br><br>
-                                    <label title='{LanguageManager.Get("TipSchedule")}'><input type='checkbox' name='sched' value='1' {chk(form.chkSchedule.IsOn)}> {LanguageManager.Get("ScheduleLabel")}</label>
+                                    <label title='{LanguageManager.Get("TipStartWindows")}'><input type='checkbox' name='startwin' value='1' {chk(startWinOn)}> {LanguageManager.Get("StartWindowsLabel")}</label><br><br>
+                                    <label title='{LanguageManager.Get("TipSchedule")}'><input type='checkbox' name='sched' value='1' {chk(schedOn)}> {LanguageManager.Get("ScheduleLabel")}</label>
                                     <div class='flex' style='margin-top:10px'>
-                                        <div><label>{LanguageManager.Get("ScheduleStartLabel")}</label><br><input type='text' name='sched_s' value='{form.ScheduleStartText}' placeholder='05:45'></div>
-                                        <div><label>{LanguageManager.Get("ScheduleEndLabel")}</label><br><input type='text' name='sched_e' value='{form.ScheduleEndText}' placeholder='22:15'></div>
+                                        <div><label>{LanguageManager.Get("ScheduleStartLabel")}</label><br><input type='text' name='sched_s' value='{schedStart}' placeholder='05:45'></div>
+                                        <div><label>{LanguageManager.Get("ScheduleEndLabel")}</label><br><input type='text' name='sched_e' value='{schedEnd}' placeholder='22:15'></div>
                                     </div>
                                 </div>
 
@@ -683,7 +724,7 @@ namespace ScreenToRTSP.UI
                                 </div>
                                 <script>
                                     function showPreview() {{
-                                        document.getElementById('previewContainer').innerHTML = ""<iframe src='http://"" + window.location.hostname + "":8880/{form.txtStreamName.Text}/' style='width:100%; height:100%; border:none;' allowfullscreen></iframe>"";
+                                        document.getElementById('previewContainer').innerHTML = ""<iframe src='http://"" + window.location.hostname + "":8880/{streamName}/' style='width:100%; height:100%; border:none;' allowfullscreen></iframe>"";
                                         document.getElementById('previewModal').style.display='flex';
                                     }}
                                     function hidePreview() {{
@@ -692,7 +733,6 @@ namespace ScreenToRTSP.UI
                                     }}
                                 </script>
                                 </body></html>";
-                            });
 
                             byte[] buffer = Encoding.UTF8.GetBytes(html);
                             response.ContentLength64 = buffer.Length;

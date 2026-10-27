@@ -16,6 +16,28 @@ namespace ScreenToRTSP.Core
 
     public static class DependencyManager
     {
+        internal static readonly HttpClient SharedHttpClient = CreateSharedHttpClient();
+
+        private static string _cachedFfmpegVersion;
+        private static DateTime _cachedFfmpegWriteTime;
+        private static string _cachedMtxVersion;
+        private static DateTime _cachedMtxWriteTime;
+
+        private static HttpClient CreateSharedHttpClient()
+        {
+            var handler = new SocketsHttpHandler
+            {
+                PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+                AutomaticDecompression = System.Net.DecompressionMethods.All
+            };
+            var client = new HttpClient(handler)
+            {
+                Timeout = TimeSpan.FromMinutes(10)
+            };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("ScreenToRTSP/2.0");
+            return client;
+        }
+
         public static bool HasUpdateAvailable { get; private set; } = false;
         public static bool HasMtxUpdate { get; private set; } = false;
         public static bool HasFfmpegUpdate { get; private set; } = false;
@@ -137,14 +159,10 @@ namespace ScreenToRTSP.Core
 
         private static async Task<System.Text.Json.JsonElement> GetLatestRelease(string repoUrl)
         {
-            using (HttpClient client = new HttpClient())
+            var response = await SharedHttpClient.GetStringAsync($"https://api.github.com/repos/{repoUrl}/releases/latest");
+            using (var doc = System.Text.Json.JsonDocument.Parse(response))
             {
-                client.DefaultRequestHeaders.Add("User-Agent", "ScreenToRTSP");
-                var response = await client.GetStringAsync($"https://api.github.com/repos/{repoUrl}/releases/latest");
-                using (var doc = System.Text.Json.JsonDocument.Parse(response))
-                {
-                    return doc.RootElement.Clone();
-                }
+                return doc.RootElement.Clone();
             }
         }
 
@@ -173,8 +191,12 @@ namespace ScreenToRTSP.Core
         {
             try
             {
-                var mtxRelease = await GetLatestRelease("bluenviron/mediamtx");
-                var ffmpegRelease = await GetLatestRelease("GyanD/codexffmpeg");
+                var mtxTask = GetLatestRelease("bluenviron/mediamtx");
+                var ffmpegTask = GetLatestRelease("GyanD/codexffmpeg");
+                await Task.WhenAll(mtxTask, ffmpegTask);
+
+                var mtxRelease = await mtxTask;
+                var ffmpegRelease = await ffmpegTask;
 
                 string mtxLatest = mtxRelease.GetProperty("tag_name").GetString();
                 string ffmpegLatest = ffmpegRelease.GetProperty("tag_name").GetString();
@@ -182,8 +204,9 @@ namespace ScreenToRTSP.Core
                 MtxLatestVersionStr = mtxLatest ?? "";
                 FfmpegLatestVersionStr = ffmpegLatest ?? "";
 
-                string mtxCurrent = GetMediaMTXVersion();
-                string ffmpegCurrent = GetFFmpegVersion();
+                await WarmupVersionCacheAsync();
+                string mtxCurrent = GetMediaMTXVersion(allowBlocking: true);
+                string ffmpegCurrent = GetFFmpegVersion(allowBlocking: true);
 
                 HasMtxUpdate = false;
                 HasFfmpegUpdate = false;
@@ -204,33 +227,38 @@ namespace ScreenToRTSP.Core
 
         private static async Task DownloadFileWithProgress(string url, string destination, IProgress<DependencyProgress> progress, string componentName)
         {
-            using (HttpClient client = new HttpClient())
+            using (var response = await SharedHttpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead))
             {
-                client.DefaultRequestHeaders.Add("User-Agent", "ScreenToRTSP");
-                using (var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead))
+                response.EnsureSuccessStatusCode();
+                var totalBytes = response.Content.Headers.ContentLength ?? -1L;
+                var canReportProgress = totalBytes != -1;
+
+                using (var stream = await response.Content.ReadAsStreamAsync())
+                using (var fileStream = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true))
                 {
-                    response.EnsureSuccessStatusCode();
-                    var totalBytes = response.Content.Headers.ContentLength ?? -1L;
-                    var canReportProgress = totalBytes != -1;
+                    var buffer = new byte[65536];
+                    long totalRead = 0;
+                    int bytesRead;
+                    int lastReportedPercent = -1;
+                    long lastReportTick = 0;
 
-                    using (var stream = await response.Content.ReadAsStreamAsync())
-                    using (var fileStream = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
+                    while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
                     {
-                        var buffer = new byte[8192];
-                        long totalRead = 0;
-                        int bytesRead;
+                        await fileStream.WriteAsync(buffer, 0, bytesRead);
+                        totalRead += bytesRead;
 
-                        while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                        if (canReportProgress && progress != null)
                         {
-                            await fileStream.WriteAsync(buffer, 0, bytesRead);
-                            totalRead += bytesRead;
-
-                            if (canReportProgress)
+                            double percentComplete = (double)(totalRead * 100) / totalBytes;
+                            int intPercent = (int)percentComplete;
+                            long nowTick = Environment.TickCount64;
+                            if (intPercent != lastReportedPercent && (nowTick - lastReportTick >= 50 || intPercent == 100))
                             {
-                                double percentComplete = (double)(totalRead * 100) / totalBytes;
-                                progress?.Report(new DependencyProgress
+                                lastReportedPercent = intPercent;
+                                lastReportTick = nowTick;
+                                progress.Report(new DependencyProgress
                                 {
-                                    StatusText = $"{componentName}: {(int)percentComplete}% ({(totalRead / 1024 / 1024)} MB / {(totalBytes / 1024 / 1024)} MB)",
+                                    StatusText = $"{componentName}: {intPercent}% ({(totalRead / 1024 / 1024)} MB / {(totalBytes / 1024 / 1024)} MB)",
                                     Percent = percentComplete,
                                     IsIndeterminate = false
                                 });
@@ -241,13 +269,31 @@ namespace ScreenToRTSP.Core
             }
         }
 
-        public static string GetFFmpegVersion()
+        public static Task WarmupVersionCacheAsync()
+        {
+            return Task.WhenAll(
+                Task.Run(() => GetFFmpegVersion(allowBlocking: true)),
+                Task.Run(() => GetMediaMTXVersion(allowBlocking: true)));
+        }
+
+        public static string GetFFmpegVersion(bool allowBlocking = false)
         {
             try
             {
                 string appDir = MonitorHelper.AppDir;
                 string ffmpeg = Path.Combine(appDir, "ffmpeg.exe");
                 if (!File.Exists(ffmpeg)) return "N/A";
+
+                DateTime writeTime = File.GetLastWriteTimeUtc(ffmpeg);
+                if (_cachedFfmpegVersion != null && _cachedFfmpegWriteTime == writeTime)
+                {
+                    return _cachedFfmpegVersion;
+                }
+
+                if (!allowBlocking)
+                {
+                    return _cachedFfmpegVersion ?? "...";
+                }
 
                 var psi = new System.Diagnostics.ProcessStartInfo
                 {
@@ -260,12 +306,16 @@ namespace ScreenToRTSP.Core
                 using (var proc = System.Diagnostics.Process.Start(psi))
                 {
                     string line = proc.StandardOutput.ReadLine();
-                    proc.WaitForExit();
+                    proc.WaitForExit(1500);
                     if (!string.IsNullOrEmpty(line))
                     {
                         var parts = line.Split(' ');
                         if (parts.Length >= 3)
-                            return parts[2];
+                        {
+                            _cachedFfmpegWriteTime = writeTime;
+                            _cachedFfmpegVersion = parts[2];
+                            return _cachedFfmpegVersion;
+                        }
                     }
                 }
             }
@@ -273,13 +323,24 @@ namespace ScreenToRTSP.Core
             return "N/A";
         }
 
-        public static string GetMediaMTXVersion()
+        public static string GetMediaMTXVersion(bool allowBlocking = false)
         {
             try
             {
                 string appDir = MonitorHelper.AppDir;
                 string mediamtx = Path.Combine(appDir, "mediamtx.exe");
                 if (!File.Exists(mediamtx)) return "N/A";
+
+                DateTime writeTime = File.GetLastWriteTimeUtc(mediamtx);
+                if (_cachedMtxVersion != null && _cachedMtxWriteTime == writeTime)
+                {
+                    return _cachedMtxVersion;
+                }
+
+                if (!allowBlocking)
+                {
+                    return _cachedMtxVersion ?? "...";
+                }
 
                 var psi = new System.Diagnostics.ProcessStartInfo
                 {
@@ -292,8 +353,13 @@ namespace ScreenToRTSP.Core
                 using (var proc = System.Diagnostics.Process.Start(psi))
                 {
                     string output = proc.StandardOutput.ReadToEnd().Trim();
-                    proc.WaitForExit();
-                    return output;
+                    proc.WaitForExit(1500);
+                    if (!string.IsNullOrEmpty(output))
+                    {
+                        _cachedMtxWriteTime = writeTime;
+                        _cachedMtxVersion = output;
+                        return _cachedMtxVersion;
+                    }
                 }
             }
             catch { }

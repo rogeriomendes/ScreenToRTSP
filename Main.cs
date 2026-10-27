@@ -30,7 +30,7 @@ namespace ScreenToRTSP
         internal DispatcherQueueTimer saveStatusTimer;
         internal DispatcherQueueTimer portTypingTimer;
 
-        internal bool isTransmitting = false;
+        internal volatile bool isTransmitting = false;
         internal bool isForceClosing = false;
         internal string currentPassword = "";
         internal bool langChanged = false;
@@ -57,6 +57,9 @@ namespace ScreenToRTSP
         private string pendingUpdateUrl = null;
         private bool hasPendingBinUpdate = false;
         private WinUITextBoxWriter _logWriter;
+        internal WinUITextBoxWriter LogWriter => _logWriter;
+        private SolidColorBrush _brushRunning;
+        private SolidColorBrush _brushStopped;
 
         internal string ScheduleStartText
         {
@@ -107,7 +110,7 @@ namespace ScreenToRTSP
             CheckStartupRegistry();
             AttachAutoSaveHandlers();
 
-            _logWriter = new WinUITextBoxWriter(rtbLogs, DispatcherQueue, maxLines: 300);
+            _logWriter = new WinUITextBoxWriter(rtbLogs, DispatcherQueue, maxLines: 300, isVisibleProvider: () => PageLogs != null && PageLogs.Visibility == Visibility.Visible);
             Console.SetOut(_logWriter);
             Console.WriteLine("--- " + LanguageManager.Get("AppTitle") + " Logs ---");
 
@@ -128,6 +131,12 @@ namespace ScreenToRTSP
                     return;
                 }
             }
+
+            _ = Task.Run(async () =>
+            {
+                await DependencyManager.WarmupVersionCacheAsync();
+                DispatcherQueue.TryEnqueue(RefreshAboutVersionLabels);
+            });
 
             bool startMinimized = startupArgs != null && Array.IndexOf(startupArgs, "--minimized") >= 0;
             bool startResume = startupArgs != null && Array.IndexOf(startupArgs, "--resume") >= 0;
@@ -167,6 +176,7 @@ namespace ScreenToRTSP
             bool result = await DependencyManager.DownloadDependenciesAsync(force, progress);
             DownloadOverlayGrid.Visibility = Visibility.Collapsed;
             RefreshAboutVersionLabels();
+            _ = Task.Run(() => MonitorHelper.TrimProcessMemory());
             return result;
         }
 
@@ -640,6 +650,11 @@ namespace ScreenToRTSP
                 PageConfig.Visibility = tag == "config" ? Visibility.Visible : Visibility.Collapsed;
                 PageLogs.Visibility = tag == "logs" ? Visibility.Visible : Visibility.Collapsed;
                 PageAbout.Visibility = tag == "about" ? Visibility.Visible : Visibility.Collapsed;
+
+                if (tag == "logs")
+                {
+                    _logWriter?.FlushToUI();
+                }
             }
         }
 
@@ -657,8 +672,10 @@ namespace ScreenToRTSP
 
             try
             {
-                await Updater.CheckForUpdatesAsync();
-                bool hasUpdate = await DependencyManager.CheckForNewVersionsAsync(true);
+                var appUpdateTask = Updater.CheckForUpdatesAsync();
+                var depUpdateTask = DependencyManager.CheckForNewVersionsAsync(true);
+                await Task.WhenAll(appUpdateTask, depUpdateTask);
+                bool hasUpdate = await depUpdateTask;
                 RefreshAboutVersionLabels();
 
                 if (hasUpdate || Updater.HasAppUpdate)
@@ -863,9 +880,7 @@ namespace ScreenToRTSP
                 string[] langKeys = { "System", "pt-BR", "es-ES", "en-US" };
                 int lIdx = Math.Clamp(cmbLanguage.SelectedIndex, 0, langKeys.Length - 1);
                 string newLang = langKeys[lIdx];
-                var oldCfg = configManager.Load();
-                string oldLang = oldCfg.ContainsKey("Language") ? oldCfg["Language"] : "System";
-                if (newLang != oldLang) langChanged = true;
+                if (newLang != LanguageManager.CurrentLangCode) langChanged = true;
                 lines.Add("Language=" + newLang);
 
                 string themeStr = cmbTheme.SelectedIndex == 1 ? "Dark" : (cmbTheme.SelectedIndex == 2 ? "Light" : "System");
@@ -919,14 +934,16 @@ namespace ScreenToRTSP
                 IconBtnStart.Glyph = "\uE71A"; // Stop symbol
                 LblBtnStart.Text = LanguageManager.Get("BtnStop");
                 lblStatus.Text = $"{LanguageManager.Get("StatusPrefix")}{LanguageManager.Get("StatusRunning")}";
-                StatusDot.Fill = new SolidColorBrush(Color.FromArgb(255, 34, 197, 94));
+                _brushRunning ??= new SolidColorBrush(Color.FromArgb(255, 34, 197, 94));
+                StatusDot.Fill = _brushRunning;
             }
             else
             {
                 IconBtnStart.Glyph = "\uE768"; // Play symbol
                 LblBtnStart.Text = LanguageManager.Get("BtnStart");
                 lblStatus.Text = $"{LanguageManager.Get("StatusPrefix")}{LanguageManager.Get("StatusStopped")}";
-                StatusDot.Fill = new SolidColorBrush(Color.FromArgb(255, 225, 29, 72));
+                _brushStopped ??= new SolidColorBrush(Color.FromArgb(255, 225, 29, 72));
+                StatusDot.Fill = _brushStopped;
             }
         }
 
@@ -1051,6 +1068,7 @@ namespace ScreenToRTSP
             {
                 if (trayIcon != null) trayIcon.Visible = true;
                 _appWindow?.Hide();
+                _ = Task.Run(() => MonitorHelper.TrimProcessMemory());
             }
             catch { }
         }
@@ -1071,8 +1089,10 @@ namespace ScreenToRTSP
 
         public async Task RunBackgroundUpdateCheck()
         {
-            var updateInfo = await Updater.CheckForUpdatesAsync();
-            await DependencyManager.CheckForNewVersionsAsync();
+            var appUpdateTask = Updater.CheckForUpdatesAsync();
+            var depUpdateTask = DependencyManager.CheckForNewVersionsAsync();
+            await Task.WhenAll(appUpdateTask, depUpdateTask);
+            var updateInfo = await appUpdateTask;
             bool hasBinUpdate = DependencyManager.HasFfmpegUpdate || DependencyManager.HasMtxUpdate;
 
             if (updateInfo.HasUpdate || hasBinUpdate)
@@ -1142,6 +1162,7 @@ namespace ScreenToRTSP
             InvokeSafe(() =>
             {
                 string labelText = "";
+                string localIp = (isTransmitting || chkWebServer.IsOn) ? mediaServer.GetLocalIPAddress() : "127.0.0.1";
                 if (isTransmitting)
                 {
                     string actualPass = string.IsNullOrEmpty(txtPassword.Password) ? currentPassword : txtPassword.Password;
@@ -1150,8 +1171,8 @@ namespace ScreenToRTSP
                         : "";
                     string streamName = string.IsNullOrWhiteSpace(txtStreamName.Text) ? "camera1" : txtStreamName.Text.Trim().Trim('/');
 
-                    currentLanUrl = $"rtsp://{auth}{mediaServer.GetLocalIPAddress()}:{txtPort.Text}/{streamName}";
-                    currentLanLowUrl = $"rtsp://{auth}{mediaServer.GetLocalIPAddress()}:{txtPort.Text}/{streamName}_low";
+                    currentLanUrl = $"rtsp://{auth}{localIp}:{txtPort.Text}/{streamName}";
+                    currentLanLowUrl = $"rtsp://{auth}{localIp}:{txtPort.Text}/{streamName}_low";
 
                     labelText += $"Principal: {currentLanUrl}";
                     if (chkDualStream.IsOn) labelText += $"\nLeve:      {currentLanLowUrl}";
@@ -1168,7 +1189,7 @@ namespace ScreenToRTSP
 
                 if (chkWebServer.IsOn)
                 {
-                    currentWebUrl = $"http://{mediaServer.GetLocalIPAddress()}:{txtWebPort.Text}";
+                    currentWebUrl = $"http://{localIp}:{txtWebPort.Text}";
                     if (lblWebUrl != null) lblWebUrl.Text = currentWebUrl;
                     btnCopyWeb.Visibility = Visibility.Visible;
                 }
@@ -1188,16 +1209,20 @@ namespace ScreenToRTSP
         private readonly TextBox _textBox;
         private readonly DispatcherQueue _dispatcher;
         private readonly int _maxLines;
+        private readonly Func<bool> _isVisibleProvider;
         private readonly Queue<string> _lines = new Queue<string>();
         private readonly StringBuilder _currentLine = new StringBuilder();
         private readonly object _sync = new object();
         private bool _uiUpdatePending = false;
+        private bool _isDirty = false;
+        private long _lastUiFlushTick = 0;
 
-        public WinUITextBoxWriter(TextBox textBox, DispatcherQueue dispatcher, int maxLines = 300)
+        public WinUITextBoxWriter(TextBox textBox, DispatcherQueue dispatcher, int maxLines = 300, Func<bool> isVisibleProvider = null)
         {
             _textBox = textBox;
             _dispatcher = dispatcher;
             _maxLines = Math.Max(10, maxLines);
+            _isVisibleProvider = isVisibleProvider;
         }
 
         public void Clear()
@@ -1206,7 +1231,47 @@ namespace ScreenToRTSP
             {
                 _lines.Clear();
                 _currentLine.Clear();
+                _isDirty = false;
             }
+        }
+
+        public string GetSnapshot()
+        {
+            lock (_sync)
+            {
+                var sb = new StringBuilder(_lines.Count * 64);
+                foreach (var line in _lines)
+                {
+                    sb.AppendLine(line);
+                }
+                if (_currentLine.Length > 0)
+                {
+                    sb.Append(_currentLine);
+                }
+                return sb.ToString();
+            }
+        }
+
+        public void FlushToUI()
+        {
+            if (_dispatcher == null) return;
+            _dispatcher.TryEnqueue(() =>
+            {
+                string snapshot;
+                lock (_sync)
+                {
+                    _uiUpdatePending = false;
+                    _isDirty = false;
+                    _lastUiFlushTick = Environment.TickCount64;
+                }
+                snapshot = GetSnapshot();
+                try
+                {
+                    _textBox.Text = snapshot;
+                    _textBox.SelectionStart = snapshot.Length;
+                }
+                catch { }
+            });
         }
 
         public override void Write(char value) => Write(value.ToString());
@@ -1237,7 +1302,9 @@ namespace ScreenToRTSP
                     }
                 }
 
-                if (!_uiUpdatePending)
+                _isDirty = true;
+                long now = Environment.TickCount64;
+                if (!_uiUpdatePending && (now - _lastUiFlushTick) >= 200)
                 {
                     _uiUpdatePending = true;
                     shouldSchedule = true;
@@ -1248,26 +1315,33 @@ namespace ScreenToRTSP
             {
                 _dispatcher.TryEnqueue(() =>
                 {
+                    if (_isVisibleProvider != null && !_isVisibleProvider())
+                    {
+                        lock (_sync)
+                        {
+                            _uiUpdatePending = false;
+                        }
+                        return;
+                    }
+
                     string snapshot;
                     lock (_sync)
                     {
+                        if (!_isDirty)
+                        {
+                            _uiUpdatePending = false;
+                            return;
+                        }
                         _uiUpdatePending = false;
-                        var sb = new StringBuilder();
-                        foreach (var line in _lines)
-                        {
-                            sb.AppendLine(line);
-                        }
-                        if (_currentLine.Length > 0)
-                        {
-                            sb.Append(_currentLine);
-                        }
-                        snapshot = sb.ToString();
+                        _isDirty = false;
+                        _lastUiFlushTick = Environment.TickCount64;
                     }
 
+                    snapshot = GetSnapshot();
                     try
                     {
                         _textBox.Text = snapshot;
-                        _textBox.SelectionStart = _textBox.Text.Length;
+                        _textBox.SelectionStart = snapshot.Length;
                     }
                     catch { }
                 });

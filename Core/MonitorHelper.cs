@@ -1,14 +1,20 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Runtime;
 using System.Runtime.InteropServices;
 
 namespace ScreenToRTSP.Core
 {
     public static class MonitorHelper
     {
-        public static string AppDir => Path.GetDirectoryName(Environment.ProcessPath) ?? AppDomain.CurrentDomain.BaseDirectory;
+        private static string _cachedAppDir;
+        public static string AppDir => _cachedAppDir ??= (Path.GetDirectoryName(Environment.ProcessPath) ?? AppDomain.CurrentDomain.BaseDirectory);
+
+        private static List<Rectangle> _cachedMonitors;
+        private static long _cachedMonitorsTick;
 
         private delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
 
@@ -24,8 +30,17 @@ namespace ScreenToRTSP.Core
         [DllImport("user32.dll")]
         private static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
 
-        public static List<Rectangle> GetMonitors()
+        [DllImport("psapi.dll")]
+        private static extern bool EmptyWorkingSet(IntPtr hProcess);
+
+        public static List<Rectangle> GetMonitors(bool forceRefresh = false)
         {
+            long now = Environment.TickCount64;
+            if (!forceRefresh && _cachedMonitors != null && (now - _cachedMonitorsTick) < 5000)
+            {
+                return _cachedMonitors;
+            }
+
             var monitors = new List<Rectangle>();
             EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData) =>
             {
@@ -36,7 +51,22 @@ namespace ScreenToRTSP.Core
                     lprcMonitor.Bottom - lprcMonitor.Top));
                 return true;
             }, IntPtr.Zero);
+
+            _cachedMonitors = monitors;
+            _cachedMonitorsTick = now;
             return monitors;
+        }
+
+        public static void TrimProcessMemory()
+        {
+            try
+            {
+                GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+                GC.Collect(2, GCCollectionMode.Optimized, blocking: false, compacting: true);
+                using var proc = Process.GetCurrentProcess();
+                EmptyWorkingSet(proc.Handle);
+            }
+            catch { }
         }
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]

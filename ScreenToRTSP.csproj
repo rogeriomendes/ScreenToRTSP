@@ -19,6 +19,7 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <TieredPGO>true</TieredPGO>
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
     <DefaultItemExcludes>$(DefaultItemExcludes);build\**</DefaultItemExcludes>

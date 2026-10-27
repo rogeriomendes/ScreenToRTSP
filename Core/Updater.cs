@@ -17,29 +17,31 @@ namespace ScreenToRTSP.Core
         public static bool HasAppUpdate { get; private set; } = false;
         public static string LatestVersionStr { get; private set; } = "";
         public static string LatestDownloadUrl { get; private set; } = "";
+        private static string _cachedAppVersion;
 
         public static string GetAppVersion()
         {
+            if (_cachedAppVersion != null) return _cachedAppVersion;
             try
             {
                 var ver = Assembly.GetExecutingAssembly().GetName().Version;
                 if (ver != null)
                 {
-                    return $"{ver.Major}.{ver.Minor}.{ver.Build}";
+                    _cachedAppVersion = $"{ver.Major}.{ver.Minor}.{ver.Build}";
+                    return _cachedAppVersion;
                 }
             }
             catch { }
-            return "2.0.0";
+            _cachedAppVersion = "2.0.0";
+            return _cachedAppVersion;
         }
 
         public static async Task<(bool HasUpdate, string DownloadUrl, string Version)> CheckForUpdatesAsync()
         {
             try
             {
-                using (var client = new HttpClient())
+                using (var response = await DependencyManager.SharedHttpClient.GetAsync($"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/latest"))
                 {
-                    client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("ScreenToRTSP", "2.0"));
-                    var response = await client.GetAsync($"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/latest");
                     if (!response.IsSuccessStatusCode) return (false, null, null);
 
                     var json = await response.Content.ReadAsStringAsync();
@@ -95,14 +97,13 @@ namespace ScreenToRTSP.Core
                 string ext = isZip ? ".zip" : ".exe";
                 string tempFile = Path.Combine(Path.GetTempPath(), "ScreenToRTSP_Update" + ext);
 
-                using (var client = new HttpClient())
+                using (var response = await DependencyManager.SharedHttpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead))
                 {
-                    client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("ScreenToRTSP", "2.0"));
-                    var response = await client.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
+                    response.EnsureSuccessStatusCode();
                     using (var streamToReadFrom = await response.Content.ReadAsStreamAsync())
-                    using (var streamToWriteTo = File.Open(tempFile, FileMode.Create))
+                    using (var streamToWriteTo = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true))
                     {
-                        await streamToReadFrom.CopyToAsync(streamToWriteTo);
+                        await streamToReadFrom.CopyToAsync(streamToWriteTo, 65536);
                     }
                 }
 
