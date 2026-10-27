@@ -11,7 +11,7 @@ namespace ScreenToRTSP.Core
 
         public ConfigManager()
         {
-            configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, System.Diagnostics.Process.GetCurrentProcess().ProcessName + ".ini");
+            configPath = Path.Combine(MonitorHelper.AppDir, System.Diagnostics.Process.GetCurrentProcess().ProcessName + ".ini");
         }
 
         public string EncryptPassword(string clearText)

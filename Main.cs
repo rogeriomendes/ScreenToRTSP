@@ -46,7 +46,7 @@ namespace ScreenToRTSP
         internal Thread webServerThread;
         internal bool isWebServerRunning = false;
 
-        internal string AppDataPath => AppDomain.CurrentDomain.BaseDirectory;
+        internal string AppDataPath => MonitorHelper.AppDir;
 
         internal WebPanel webPanel;
         internal MediaServer mediaServer;
@@ -113,8 +113,61 @@ namespace ScreenToRTSP
 
             if (chkWebServer.IsOn) webPanel.Start();
             UpdateUrlStatus();
+        }
+
+        public async Task InitializeStartupAsync(string[] startupArgs)
+        {
+            if (!DependencyManager.AreDependenciesInstalled())
+            {
+                bool ok = await RunDependencyDownloadWithOverlayAsync(force: false);
+                if (!ok)
+                {
+                    isForceClosing = true;
+                    trayIcon?.Dispose();
+                    Application.Current.Exit();
+                    return;
+                }
+            }
+
+            bool startMinimized = startupArgs != null && Array.IndexOf(startupArgs, "--minimized") >= 0;
+            bool startResume = startupArgs != null && Array.IndexOf(startupArgs, "--resume") >= 0;
+
+            if (startMinimized)
+            {
+                StartAuto();
+            }
+            else if (startResume)
+            {
+                StartClick();
+            }
 
             _ = RunBackgroundUpdateCheck();
+        }
+
+        public async Task<bool> RunDependencyDownloadWithOverlayAsync(bool force = false)
+        {
+            DownloadOverlayGrid.Visibility = Visibility.Visible;
+            LblDownloadProgress.Text = "Iniciando...";
+            PbDownload.IsIndeterminate = true;
+            PbDownload.Value = 0;
+
+            var progress = new Progress<DependencyProgress>(p =>
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    LblDownloadProgress.Text = p.StatusText;
+                    PbDownload.IsIndeterminate = p.IsIndeterminate;
+                    if (!p.IsIndeterminate)
+                    {
+                        PbDownload.Value = p.Percent;
+                    }
+                });
+            });
+
+            bool result = await DependencyManager.DownloadDependenciesAsync(force, progress);
+            DownloadOverlayGrid.Visibility = Visibility.Collapsed;
+            RefreshAboutVersionLabels();
+            return result;
         }
 
         private void InitializeAppWindow()
@@ -483,8 +536,7 @@ namespace ScreenToRTSP
                 {
                     bool wasTransmitting = isTransmitting;
                     if (wasTransmitting) StopClick();
-                    var dlWin = new DependencyDownloadWindow();
-                    await dlWin.RunDownloadAsync(true);
+                    await RunDependencyDownloadWithOverlayAsync(true);
                     if (wasTransmitting) StartClick();
                     hasPendingBinUpdate = false;
                 }
@@ -574,6 +626,12 @@ namespace ScreenToRTSP
 
         private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
         {
+            if (PageVideo == null || PageNetwork == null || PageAutomation == null ||
+                PageConfig == null || PageLogs == null || PageAbout == null)
+            {
+                return;
+            }
+
             if (args.SelectedItem is NavigationViewItem item && item.Tag is string tag)
             {
                 PageVideo.Visibility = tag == "video" ? Visibility.Visible : Visibility.Collapsed;
@@ -652,8 +710,7 @@ namespace ScreenToRTSP
             bool updatedDeps = false;
             if (DependencyManager.HasFfmpegUpdate || DependencyManager.HasMtxUpdate)
             {
-                var dlWin = new DependencyDownloadWindow();
-                if (await dlWin.RunDownloadAsync(true))
+                if (await RunDependencyDownloadWithOverlayAsync(true))
                 {
                     await DependencyManager.CheckForNewVersionsAsync();
                     updatedDeps = true;

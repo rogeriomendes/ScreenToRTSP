@@ -49,13 +49,13 @@ namespace ScreenToRTSP.Core
 
         private string GetFfmpegPath()
         {
-            string local = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
+            string local = Path.Combine(MonitorHelper.AppDir, "ffmpeg.exe");
             return File.Exists(local) ? local : Path.Combine(currentConfig.AppDataPath, "ffmpeg.exe");
         }
 
         private string GetMediamtxPath()
         {
-            string local = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "mediamtx.exe");
+            string local = Path.Combine(MonitorHelper.AppDir, "mediamtx.exe");
             return File.Exists(local) ? local : Path.Combine(currentConfig.AppDataPath, "mediamtx.exe");
         }
 

@@ -8,14 +8,24 @@
     <ApplicationIcon>assets\icon.ico</ApplicationIcon>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <SelfContained>true</SelfContained>
     <UseWinUI>true</UseWinUI>
     <EnableMsixTooling>true</EnableMsixTooling>
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <DefaultItemExcludes>$(DefaultItemExcludes);build\**</DefaultItemExcludes>
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <NoWarn>1690,8600,8601,8602,8603,8604,8618,8625</NoWarn>
 
     <Version>2.0.0</Version>
@@ -36,11 +46,141 @@
 
   <ItemGroup>
     <EmbeddedResource Include="assets\icon.png" />
-    <Content Include="assets\icon.ico">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="assets\icon.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
+
+  <UsingTask TaskName="DeduplicateAppManifest" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <ManifestPath ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.Collections.Generic" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Linq" />
+      <Using Namespace="System.Xml" />
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
+        if (File.Exists(ManifestPath))
+        {
+            var doc = new XmlDocument();
+            doc.PreserveWhitespace = false;
+            doc.Load(ManifestPath);
+            var root = doc.DocumentElement;
+            if (root != null)
+            {
+                var seen = new Dictionary<string, XmlElement>(StringComparer.OrdinalIgnoreCase);
+                var toRemove = new List<XmlNode>();
+                foreach (XmlNode node in root.ChildNodes)
+                {
+                    if (node is XmlElement el && el.LocalName == "file")
+                    {
+                        var name = el.GetAttribute("name");
+                        if (!string.IsNullOrEmpty(name))
+                        {
+                            var fileNameOnly = Path.GetFileName(name);
+                            if (fileNameOnly != name)
+                            {
+                                el.SetAttribute("name", fileNameOnly);
+                                if (el.HasAttribute("loadFrom"))
+                                {
+                                    el.SetAttribute("loadFrom", "%MICROSOFT_WINDOWSAPPRUNTIME_BASE_DIRECTORY%" + fileNameOnly);
+                                }
+                                name = fileNameOnly;
+                            }
+                            if (seen.TryGetValue(name, out var existing))
+                            {
+                                while (el.HasChildNodes)
+                                {
+                                    existing.AppendChild(el.FirstChild);
+                                }
+                                toRemove.Add(el);
+                            }
+                            else
+                            {
+                                seen[name] = el;
+                            }
+                        }
+                    }
+                }
+                foreach (var dup in toRemove)
+                {
+                    root.RemoveChild(dup);
+                }
+                doc.Save(ManifestPath);
+            }
+        }
+        ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="DeduplicateWin32Manifest" AfterTargets="CreateWinRTRegistration" BeforeTargets="AssignTargetPaths;CoreCompile">
+    <DeduplicateAppManifest ManifestPath="$(ApplicationManifest)" />
+  </Target>
+
+  <UsingTask TaskName="DeduplicateBundleItems" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <InputItems ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+      <OutputItems ParameterType="Microsoft.Build.Framework.ITaskItem[]" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.Collections.Generic" />
+      <Using Namespace="Microsoft.Build.Framework" />
+      <Using Namespace="Microsoft.Build.Utilities" />
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new List<ITaskItem>();
+        ITaskItem priItem = null;
+        foreach (var item in InputItems)
+        {
+            var rel = item.GetMetadata("RelativePath");
+            if (string.IsNullOrEmpty(rel)) continue;
+            if (rel.EndsWith(".mui", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!rel.StartsWith("en-US\\", StringComparison.OrdinalIgnoreCase) &&
+                    !rel.StartsWith("pt-BR\\", StringComparison.OrdinalIgnoreCase) &&
+                    !rel.StartsWith("es-ES\\", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+            }
+            if (seen.Add(rel))
+            {
+                result.Add(item);
+                if (rel.Equals("ScreenToRTSP.pri", StringComparison.OrdinalIgnoreCase))
+                {
+                    priItem = item;
+                }
+            }
+        }
+        if (priItem != null && seen.Add("resources.pri"))
+        {
+            var copy = new TaskItem(priItem);
+            copy.SetMetadata("RelativePath", "resources.pri");
+            result.Add(copy);
+        }
+        OutputItems = result.ToArray();
+        ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="DeduplicateBundleFiles" BeforeTargets="GenerateSingleFileBundle">
+    <DeduplicateBundleItems InputItems="@(FilesToBundle)">
+      <Output TaskParameter="OutputItems" ItemName="_DedupedFilesToBundle" />
+    </DeduplicateBundleItems>
+    <ItemGroup>
+      <FilesToBundle Remove="@(FilesToBundle)" />
+      <FilesToBundle Include="@(_DedupedFilesToBundle)" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="RemoveLanguageFolders" AfterTargets="Publish">
+    <ItemGroup>
+      <MuiFiles Include="$(PublishDir)*\*.mui" />
+    </ItemGroup>
+    <RemoveDir Directories="%(MuiFiles.RootDir)%(MuiFiles.Directory)" Condition="'@(MuiFiles)' != ''" />
+  </Target>
 </Project>

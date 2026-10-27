@@ -479,5 +479,52 @@
                 </Button>
             </Grid>
         </Border>
+
+        <!-- In-Window Dependency Download Overlay -->
+        <Grid
+            x:Name="DownloadOverlayGrid"
+            Grid.Row="1"
+            Grid.RowSpan="2"
+            Visibility="Collapsed"
+            Background="#B3000000">
+            <Border
+                Width="480"
+                VerticalAlignment="Center"
+                HorizontalAlignment="Center"
+                Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="28">
+                <StackPanel Spacing="18">
+                    <StackPanel Spacing="6">
+                        <TextBlock
+                            Text="Baixando componentes essenciais"
+                            Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <TextBlock
+                            Text="Baixando FFmpeg e MediaMTX. Isso ocorrerá apenas uma vez. Aguarde..."
+                            Style="{StaticResource BodyTextBlockStyle}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="10">
+                        <TextBlock
+                            x:Name="LblDownloadProgress"
+                            Text="Iniciando..."
+                            FontWeight="SemiBold"
+                            FontSize="15"
+                            HorizontalAlignment="Center" />
+                        <ProgressBar
+                            x:Name="PbDownload"
+                            Minimum="0"
+                            Maximum="100"
+                            Value="0"
+                            IsIndeterminate="True"
+                            Height="8" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

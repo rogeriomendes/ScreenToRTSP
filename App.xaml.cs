@@ -1,9 +1,9 @@
 using System;
 using System.IO;
-using System.Linq;
+using System.Threading;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using ScreenToRTSP.Core;
-using ScreenToRTSP.UI;
 
 namespace ScreenToRTSP
 {
@@ -19,49 +19,24 @@ namespace ScreenToRTSP
             {
                 try
                 {
-                    string p = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash.log");
-                    File.WriteAllText(p, e.Exception.ToString());
+                    string p = Path.Combine(MonitorHelper.AppDir, "crash.log");
+                    File.WriteAllText(p, e.Exception?.ToString() + "\r\nMessage: " + e.Message);
                 }
                 catch { }
             };
         }
 
-        protected override async void OnLaunched(LaunchActivatedEventArgs args)
+        protected override void OnLaunched(LaunchActivatedEventArgs args)
         {
-            if (!DependencyManager.AreDependenciesInstalled())
+            var dq = DispatcherQueue.GetForCurrentThread();
+            if (dq != null)
             {
-                var dlWindow = new DependencyDownloadWindow();
-                bool ok = await dlWindow.RunDownloadAsync();
-                if (!ok)
-                {
-                    Exit();
-                    return;
-                }
+                SynchronizationContext.SetSynchronizationContext(new DispatcherQueueSynchronizationContext(dq));
             }
 
-            LaunchMainWindow();
-        }
-
-        private void LaunchMainWindow()
-        {
             MainWindowInstance = new Main();
-
-            bool startMinimized = StartupArgs.Contains("--minimized");
-            bool startResume = StartupArgs.Contains("--resume");
-
-            if (startMinimized)
-            {
-                MainWindowInstance.Activate();
-                MainWindowInstance.StartAuto();
-            }
-            else
-            {
-                MainWindowInstance.Activate();
-                if (startResume)
-                {
-                    MainWindowInstance.StartClick();
-                }
-            }
+            MainWindowInstance.Activate();
+            _ = MainWindowInstance.InitializeStartupAsync(StartupArgs);
         }
     }
 }

@@ -106,8 +106,8 @@ namespace ScreenToRTSP.Core
                     }
                 }
 
-                string currentExe = Environment.ProcessPath ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ScreenToRTSP.exe");
-                string appDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
+                string currentExe = Environment.ProcessPath ?? Path.Combine(MonitorHelper.AppDir, "ScreenToRTSP.exe");
+                string appDir = MonitorHelper.AppDir.TrimEnd('\\');
                 string scriptPath = Path.Combine(Path.GetTempPath(), "update_ScreenToRTSP.ps1");
                 string resumeArg = isTransmitting ? " --resume" : "";
 

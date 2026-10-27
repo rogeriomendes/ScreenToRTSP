@@ -21,27 +21,27 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Publish WinUI 3 App
-        run: dotnet publish -c Release -r win-x64 --self-contained true -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true
+      - name: Publish Executable
+        run: dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true
 
-      - name: Package Release Zip
+      - name: Rename Executable
         run: |
           $version = "${{ github.ref_name }}"
-          $zipName = "ScreenToRTSP-$version-win-x64.zip"
-          $publishDir = "bin\Release\net10.0-windows10.0.22621.0\win-x64\publish"
+          $exeName = "ScreenToRTSP-$version.exe"
+          $sourcePath = "bin\Release\net10.0-windows10.0.22621.0\win-x64\publish\ScreenToRTSP.exe"
           
-          if (Test-Path "$publishDir\ScreenToRTSP.exe") {
-            Compress-Archive -Path "$publishDir\*" -DestinationPath ".\$zipName" -Force
-            Write-Host "Pacote $zipName gerado com sucesso."
+          if (Test-Path $sourcePath) {
+            Move-Item -Path $sourcePath -Destination ".\$exeName" -Force
+            Write-Host "Executável renomeado para $exeName com sucesso."
           } else {
-            Write-Error "Não foi possível encontrar o executável publicado em $publishDir"
+            Write-Error "Não foi possível encontrar o executável publicado no caminho $sourcePath"
             exit 1
           }
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          files: ScreenToRTSP-${{ github.ref_name }}-win-x64.zip
+          files: ScreenToRTSP-${{ github.ref_name }}.exe
           generate_release_notes: true
           draft: false
           prerelease: false

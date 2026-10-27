@@ -24,7 +24,7 @@ namespace ScreenToRTSP.Core
 
         public static bool AreDependenciesInstalled()
         {
-            string appDir = AppDomain.CurrentDomain.BaseDirectory;
+            string appDir = MonitorHelper.AppDir;
             string ffmpeg = Path.Combine(appDir, "ffmpeg.exe");
             string mediamtx = Path.Combine(appDir, "mediamtx.exe");
             return File.Exists(ffmpeg) && File.Exists(mediamtx);
@@ -32,7 +32,7 @@ namespace ScreenToRTSP.Core
 
         public static async Task<bool> DownloadDependenciesAsync(bool force = false, IProgress<DependencyProgress> progress = null)
         {
-            string appDir = AppDomain.CurrentDomain.BaseDirectory;
+            string appDir = MonitorHelper.AppDir;
             string ffmpeg = Path.Combine(appDir, "ffmpeg.exe");
             string mediamtx = Path.Combine(appDir, "mediamtx.exe");
 
@@ -245,7 +245,7 @@ namespace ScreenToRTSP.Core
         {
             try
             {
-                string appDir = AppDomain.CurrentDomain.BaseDirectory;
+                string appDir = MonitorHelper.AppDir;
                 string ffmpeg = Path.Combine(appDir, "ffmpeg.exe");
                 if (!File.Exists(ffmpeg)) return "N/A";
 
@@ -277,7 +277,7 @@ namespace ScreenToRTSP.Core
         {
             try
             {
-                string appDir = AppDomain.CurrentDomain.BaseDirectory;
+                string appDir = MonitorHelper.AppDir;
                 string mediamtx = Path.Combine(appDir, "mediamtx.exe");
                 if (!File.Exists(mediamtx)) return "N/A";
 
