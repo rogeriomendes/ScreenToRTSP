@@ -366,6 +366,13 @@ namespace ScreenToRTSP
                 NavConfig.Content = LanguageManager.Get("TabConfig");
                 NavAbout.Content = LanguageManager.Get("TabAbout");
 
+                ToolTipService.SetToolTip(NavVideo, LanguageManager.Get("TipTabVideo"));
+                ToolTipService.SetToolTip(NavNetwork, LanguageManager.Get("TipTabNetwork"));
+                ToolTipService.SetToolTip(NavAutomation, LanguageManager.Get("TipTabAutomation"));
+                ToolTipService.SetToolTip(NavConfig, LanguageManager.Get("TipTabConfig"));
+                ToolTipService.SetToolTip(NavLogs, LanguageManager.Get("TipTabLogs"));
+                ToolTipService.SetToolTip(NavAbout, LanguageManager.Get("TipTabAbout"));
+
                 HeaderVideo.Text = LanguageManager.Get("TabVideo");
                 HeaderNetwork.Text = LanguageManager.Get("TabNetwork");
                 HeaderAutomation.Text = LanguageManager.Get("TabAutomation");
@@ -375,6 +382,7 @@ namespace ScreenToRTSP
                 // Video Cards
                 CardMonitor.Header = LanguageManager.Get("MonitorLabel").TrimEnd(':');
                 CardMonitor.Description = LanguageManager.Get("TipMonitor");
+                ToolTipService.SetToolTip(cmbMonitor, LanguageManager.Get("TipMonitor"));
 
                 int monSel = cmbMonitor.SelectedIndex;
                 cmbMonitor.Items.Clear();
@@ -388,6 +396,7 @@ namespace ScreenToRTSP
 
                 CardEncoder.Header = LanguageManager.Get("EncoderLabel").TrimEnd(':');
                 CardEncoder.Description = LanguageManager.Get("TipEncoder");
+                ToolTipService.SetToolTip(cmbEncoder, LanguageManager.Get("TipEncoder"));
                 int encSel = cmbEncoder.SelectedIndex;
                 cmbEncoder.Items.Clear();
                 cmbEncoder.Items.Add(LanguageManager.Get("EncoderCPU"));
@@ -397,6 +406,7 @@ namespace ScreenToRTSP
 
                 CardQuality.Header = LanguageManager.Get("QualityLabel").TrimEnd(':');
                 CardQuality.Description = LanguageManager.Get("TipQuality");
+                ToolTipService.SetToolTip(cmbQuality, LanguageManager.Get("TipQuality"));
                 int qSel = cmbQuality.SelectedIndex;
                 cmbQuality.Items.Clear();
                 cmbQuality.Items.Add(LanguageManager.Get("QualityLow"));
@@ -406,32 +416,55 @@ namespace ScreenToRTSP
 
                 CardFps.Header = LanguageManager.Get("FpsLabel").TrimEnd(':');
                 CardFps.Description = LanguageManager.Get("TipFps");
+                ToolTipService.SetToolTip(cmbFps, LanguageManager.Get("TipFps"));
 
                 CardDualStream.Header = LanguageManager.Get("DualStreamLabel");
                 CardDualStream.Description = LanguageManager.Get("TipDualStream");
+                ToolTipService.SetToolTip(chkDualStream, LanguageManager.Get("TipDualStream"));
 
                 CardMouseCursor.Header = LanguageManager.Get("MouseCursorLabel");
                 CardMouseCursor.Description = LanguageManager.Get("TipMouseCursor");
+                ToolTipService.SetToolTip(chkMouseCursor, LanguageManager.Get("TipMouseCursor"));
 
                 // Network Cards
                 CardStreamName.Header = LanguageManager.Get("StreamNameLabel").TrimEnd(':');
+                CardStreamName.Description = LanguageManager.Get("TipStreamName");
+                ToolTipService.SetToolTip(txtStreamName, LanguageManager.Get("TipStreamName"));
+
                 CardPort.Header = LanguageManager.Get("PortLabel").TrimEnd(':');
+                CardPort.Description = LanguageManager.Get("TipPort");
+                ToolTipService.SetToolTip(txtPort, LanguageManager.Get("TipPort"));
+
                 ExpanderAuth.Header = LanguageManager.Get("AuthLabel");
+                ExpanderAuth.Description = LanguageManager.Get("TipAuth");
+                ToolTipService.SetToolTip(chkAuth, LanguageManager.Get("TipAuth"));
+
                 CardUsername.Header = LanguageManager.Get("UserLabel").TrimEnd(':');
+                ToolTipService.SetToolTip(txtUsername, LanguageManager.Get("TipUsername"));
+
                 CardPassword.Header = LanguageManager.Get("PasswordLabel").TrimEnd(':');
+                ToolTipService.SetToolTip(txtPassword, LanguageManager.Get("TipPassword"));
                 txtPassword.PlaceholderText = !string.IsNullOrEmpty(currentPassword) ? LanguageManager.Get("PassPlaceholder") : "";
 
                 // Automation Cards
                 CardStartWindows.Header = LanguageManager.Get("StartWindowsLabel");
                 CardStartWindows.Description = LanguageManager.Get("TipStartWindows");
+                ToolTipService.SetToolTip(chkStartWithWindows, LanguageManager.Get("TipStartWindows"));
+
                 ExpanderSchedule.Header = LanguageManager.Get("ScheduleLabel").TrimEnd(':');
                 ExpanderSchedule.Description = LanguageManager.Get("TipSchedule");
+                ToolTipService.SetToolTip(chkSchedule, LanguageManager.Get("TipSchedule"));
+
                 CardScheduleStart.Header = LanguageManager.Get("ScheduleStartLabel").TrimEnd(':');
+                ToolTipService.SetToolTip(tpScheduleStart, LanguageManager.Get("TipScheduleStart"));
+
                 CardScheduleEnd.Header = LanguageManager.Get("ScheduleEndLabel").TrimEnd(':');
+                ToolTipService.SetToolTip(tpScheduleEnd, LanguageManager.Get("TipScheduleEnd"));
 
                 // Config Cards
                 CardLanguage.Header = LanguageManager.Get("LanguageLabel").TrimEnd(':');
                 CardLanguage.Description = LanguageManager.Get("TipLanguage");
+                ToolTipService.SetToolTip(cmbLanguage, LanguageManager.Get("TipLanguage"));
                 var langItems = LanguageManager.GetLanguageKeys();
                 int langSel = cmbLanguage.SelectedIndex;
                 cmbLanguage.Items.Clear();
@@ -452,6 +485,8 @@ namespace ScreenToRTSP
                 }
 
                 CardTheme.Header = LanguageManager.Get("ThemeLabel").TrimEnd(':');
+                CardTheme.Description = LanguageManager.Get("TipTheme");
+                ToolTipService.SetToolTip(cmbTheme, LanguageManager.Get("TipTheme"));
                 int themeSel = cmbTheme.SelectedIndex;
                 cmbTheme.Items.Clear();
                 cmbTheme.Items.Add(LanguageManager.Get("ThemeSystem"));
@@ -464,9 +499,17 @@ namespace ScreenToRTSP
 
                 ExpanderWebServer.Header = LanguageManager.Get("WebServerLabel");
                 ExpanderWebServer.Description = LanguageManager.Get("TipWebServer");
+                ToolTipService.SetToolTip(chkWebServer, LanguageManager.Get("TipWebServer"));
+
                 CardWebPort.Header = LanguageManager.Get("WebPortLabel").TrimEnd(':');
                 CardWebPort.Description = LanguageManager.Get("TipWebPort");
+                ToolTipService.SetToolTip(txtWebPort, LanguageManager.Get("TipWebPort"));
+
                 LblBtnOpenWeb.Text = LanguageManager.Get("BtnOpenWeb");
+                ToolTipService.SetToolTip(btnCopyWeb, LanguageManager.Get("TipBtnOpenWeb"));
+
+                // Logs Button
+                ToolTipService.SetToolTip(BtnClearLogs, LanguageManager.Get("TipBtnClearLogs"));
 
                 // About Cards
                 lblAboutTitle.Text = LanguageManager.Get("AppTitle");
@@ -475,12 +518,20 @@ namespace ScreenToRTSP
                 RefreshAboutVersionLabels();
 
                 LblBtnCheckUpdates.Text = LanguageManager.Get("BtnCheckUpdates");
+                ToolTipService.SetToolTip(btnCheckUpdates, LanguageManager.Get("TipBtnCheckUpdates"));
+
                 LblBtnUpdateBinaries.Text = LanguageManager.Get("BtnUpdateBinaries");
+                ToolTipService.SetToolTip(btnUpdateBinaries, LanguageManager.Get("TipBtnUpdateBinaries"));
                 InfoBarUpdate.Title = LanguageManager.Get("UpdateAvailable");
 
                 // Bottom Bar
                 LblBtnCopyLan.Text = LanguageManager.Get("BtnCopyLan");
+                ToolTipService.SetToolTip(btnCopyLan, LanguageManager.Get("TipBtnCopyLan"));
+
                 LblBtnCopyLocal.Text = LanguageManager.Get("BtnCopyLocal");
+                ToolTipService.SetToolTip(btnCopyLocal, LanguageManager.Get("TipBtnCopyLocal"));
+
+                ToolTipService.SetToolTip(btnStart, isTransmitting ? LanguageManager.Get("TipBtnStop") : LanguageManager.Get("TipBtnStart"));
                 UpdateUrlStatus();
                 trayIcon?.SetTooltip(LanguageManager.Get("AppTitle"));
             }
@@ -933,6 +984,7 @@ namespace ScreenToRTSP
             {
                 IconBtnStart.Glyph = "\uE71A"; // Stop symbol
                 LblBtnStart.Text = LanguageManager.Get("BtnStop");
+                ToolTipService.SetToolTip(btnStart, LanguageManager.Get("TipBtnStop"));
                 lblStatus.Text = $"{LanguageManager.Get("StatusPrefix")}{LanguageManager.Get("StatusRunning")}";
                 _brushRunning ??= new SolidColorBrush(Color.FromArgb(255, 34, 197, 94));
                 StatusDot.Fill = _brushRunning;
@@ -941,6 +993,7 @@ namespace ScreenToRTSP
             {
                 IconBtnStart.Glyph = "\uE768"; // Play symbol
                 LblBtnStart.Text = LanguageManager.Get("BtnStart");
+                ToolTipService.SetToolTip(btnStart, LanguageManager.Get("TipBtnStart"));
                 lblStatus.Text = $"{LanguageManager.Get("StatusPrefix")}{LanguageManager.Get("StatusStopped")}";
                 _brushStopped ??= new SolidColorBrush(Color.FromArgb(255, 225, 29, 72));
                 StatusDot.Fill = _brushStopped;

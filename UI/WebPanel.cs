@@ -423,10 +423,10 @@ namespace ScreenToRTSP.UI
                                 }
                                 linksHtml += "</div>";
 
-                                copyBtnsHtml += $@"<button type='button' class='btn-outline' style='width:auto; flex:0 0 auto; font-size:14px; margin:0; padding:12px 14px;' onclick=""copyText('{lanUrl}')"">📋 {LanguageManager.Get("BtnCopyLan")}</button>";
+                                copyBtnsHtml += $@"<button type='button' class='btn-outline' title='{LanguageManager.Get("TipBtnCopyLan")}' style='width:auto; flex:0 0 auto; font-size:14px; margin:0; padding:12px 14px;' onclick=""copyText('{lanUrl}')"">📋 {LanguageManager.Get("BtnCopyLan")}</button>";
                                 if (dualOn)
                                 {
-                                    copyBtnsHtml += $@"<button type='button' class='btn-outline' style='width:auto; flex:0 0 auto; font-size:14px; margin:0; padding:12px 14px;' onclick=""copyText('{lanLowUrl}')"">📋 {LanguageManager.Get("BtnCopyLocal")}</button>";
+                                    copyBtnsHtml += $@"<button type='button' class='btn-outline' title='{LanguageManager.Get("TipBtnCopyLocal")}' style='width:auto; flex:0 0 auto; font-size:14px; margin:0; padding:12px 14px;' onclick=""copyText('{lanLowUrl}')"">📋 {LanguageManager.Get("BtnCopyLocal")}</button>";
                                 }
                             }
                             else
@@ -447,12 +447,12 @@ namespace ScreenToRTSP.UI
                             }
 
                             string updateBtn = DependencyManager.HasUpdateAvailable
-                                ? $@"<button type='button' style='background:#16a34a; margin:0; padding:8px; font-size:14px;' onclick=""if(Main_isTransmitting) {{ if(confirm('{LanguageManager.Get("MsgStopBeforeUpdate")}')) submitAction('update'); }} else {{ submitAction('update'); }}"">{LanguageManager.Get("BtnUpdateBinaries")}</button>"
+                                ? $@"<button type='button' title='{LanguageManager.Get("TipBtnUpdateBinaries")}' style='background:#16a34a; margin:0; padding:8px; font-size:14px;' onclick=""if(Main_isTransmitting) {{ if(confirm('{LanguageManager.Get("MsgStopBeforeUpdate")}')) submitAction('update'); }} else {{ submitAction('update'); }}"">{LanguageManager.Get("BtnUpdateBinaries")}</button>"
                                 : "";
 
                             updateHtml += $@"
                                     <div class='flex' style='margin-top:15px;'>
-                                        <div><button type='button' style='background:#3b82f6; margin:0; padding:8px; font-size:14px;' onclick=""submitAction('check')"">{LanguageManager.Get("BtnCheckUpdates")}</button></div>
+                                        <div><button type='button' title='{LanguageManager.Get("TipBtnCheckUpdates")}' style='background:#3b82f6; margin:0; padding:8px; font-size:14px;' onclick=""submitAction('check')"">{LanguageManager.Get("BtnCheckUpdates")}</button></div>
                                         <div>{updateBtn}</div>
                                     </div>";
 
@@ -566,10 +566,10 @@ namespace ScreenToRTSP.UI
                                 <div style='display:flex; gap:10px;'>
                                     <form method='POST' style='flex:1; margin:0;'>
                                         <input type='hidden' name='action' value='{btnAction}'/>
-                                        <button class='{btnClass}' style='margin:0;'>{btnText}</button>
+                                        <button class='{btnClass}' title='{(isTransmitting ? LanguageManager.Get("TipBtnStop") : LanguageManager.Get("TipBtnStart"))}' style='margin:0;'>{btnText}</button>
                                     </form>
                                     {copyBtnsHtml}
-                                    {(isTransmitting ? $"<button type='button' class='btn-outline' onclick=\"showPreview()\" style='width:auto; flex:0 0 auto; padding:12px 14px; margin:0;'>📺 {LanguageManager.Get("TabPreview")}</button>" : "")} 
+                                    {(isTransmitting ? $"<button type='button' class='btn-outline' title='{LanguageManager.Get("TipBtnPreview")}' onclick=\"showPreview()\" style='width:auto; flex:0 0 auto; padding:12px 14px; margin:0;'>📺 {LanguageManager.Get("TabPreview")}</button>" : "")} 
                                 </div>
                                 
                                 <hr>
@@ -579,12 +579,12 @@ namespace ScreenToRTSP.UI
                                     <div id='save-status' style='display:none; position:absolute; top:-25px; right:0; color:#16a34a; font-size:14px; font-weight:bold;'>✔ {LanguageManager.Get("MsgSaved")}</div>
                                 </div>
                                 <div class='tabs'>
-                                    <div class='tablinks' onclick=""openTab(event, 'tab-video')"">{LanguageManager.Get("TabVideo")}</div>
-                                    <div class='tablinks' onclick=""openTab(event, 'tab-rede')"">{LanguageManager.Get("TabNetwork")}</div>
-                                    <div class='tablinks' onclick=""openTab(event, 'tab-auto')"">{LanguageManager.Get("TabAutomation")}</div>
-                                    <div class='tablinks' onclick=""openTab(event, 'tab-config')"">{LanguageManager.Get("TabConfig")}</div>
-                                    <div class='tablinks' onclick=""openTab(event, 'tab-logs')"">Logs</div>
-                                    <div class='tablinks' onclick=""openTab(event, 'tab-sobre')"">{LanguageManager.Get("TabAbout")}</div>
+                                    <div class='tablinks' title='{LanguageManager.Get("TipTabVideo")}' onclick=""openTab(event, 'tab-video')"">{LanguageManager.Get("TabVideo")}</div>
+                                    <div class='tablinks' title='{LanguageManager.Get("TipTabNetwork")}' onclick=""openTab(event, 'tab-rede')"">{LanguageManager.Get("TabNetwork")}</div>
+                                    <div class='tablinks' title='{LanguageManager.Get("TipTabAutomation")}' onclick=""openTab(event, 'tab-auto')"">{LanguageManager.Get("TabAutomation")}</div>
+                                    <div class='tablinks' title='{LanguageManager.Get("TipTabConfig")}' onclick=""openTab(event, 'tab-config')"">{LanguageManager.Get("TabConfig")}</div>
+                                    <div class='tablinks' title='{LanguageManager.Get("TipTabLogs")}' onclick=""openTab(event, 'tab-logs')"">Logs</div>
+                                    <div class='tablinks' title='{LanguageManager.Get("TipTabAbout")}' onclick=""openTab(event, 'tab-sobre')"">{LanguageManager.Get("TabAbout")}</div>
                                 </div>
 
                                 <div id='tab-video' class='tabcontent'>
@@ -610,14 +610,14 @@ namespace ScreenToRTSP.UI
 
                                 <div id='tab-rede' class='tabcontent'>
                                     <div class='flex'>
-                                        <div><label>{LanguageManager.Get("StreamNameLabel")}</label><br><input type='text' name='stream' value='{streamName}'></div>
-                                        <div><label>{LanguageManager.Get("PortLabel")}</label><br><input type='text' name='port' value='{portText}'></div>
+                                        <div><label title='{LanguageManager.Get("TipStreamName")}'>{LanguageManager.Get("StreamNameLabel")}</label><br><input type='text' name='stream' title='{LanguageManager.Get("TipStreamName")}' value='{streamName}'></div>
+                                        <div><label title='{LanguageManager.Get("TipPort")}'>{LanguageManager.Get("PortLabel")}</label><br><input type='text' name='port' title='{LanguageManager.Get("TipPort")}' value='{portText}'></div>
                                     </div>
 
-                                    <label><input type='checkbox' name='auth' value='1' {chk(authOn)}> <b>{LanguageManager.Get("AuthLabel")}</b></label><br><br>
+                                    <label title='{LanguageManager.Get("TipAuth")}'><input type='checkbox' name='auth' value='1' {chk(authOn)}> <b>{LanguageManager.Get("AuthLabel")}</b></label><br><br>
                                     <div class='flex'>
-                                        <div><label>{LanguageManager.Get("UserLabel")}</label><br><input type='text' name='user' value='{userText}'></div>
-                                        <div><label>{LanguageManager.Get("PasswordLabel")}</label><br><input type='password' name='pass' placeholder='{LanguageManager.Get("PassPlaceholder")}'></div>
+                                        <div><label title='{LanguageManager.Get("TipUsername")}'>{LanguageManager.Get("UserLabel")}</label><br><input type='text' name='user' title='{LanguageManager.Get("TipUsername")}' value='{userText}'></div>
+                                        <div><label title='{LanguageManager.Get("TipPassword")}'>{LanguageManager.Get("PasswordLabel")}</label><br><input type='password' name='pass' title='{LanguageManager.Get("TipPassword")}' placeholder='{LanguageManager.Get("PassPlaceholder")}'></div>
                                     </div>
                                 </div>
 
@@ -625,14 +625,14 @@ namespace ScreenToRTSP.UI
                                     <label title='{LanguageManager.Get("TipStartWindows")}'><input type='checkbox' name='startwin' value='1' {chk(startWinOn)}> {LanguageManager.Get("StartWindowsLabel")}</label><br><br>
                                     <label title='{LanguageManager.Get("TipSchedule")}'><input type='checkbox' name='sched' value='1' {chk(schedOn)}> {LanguageManager.Get("ScheduleLabel")}</label>
                                     <div class='flex' style='margin-top:10px'>
-                                        <div><label>{LanguageManager.Get("ScheduleStartLabel")}</label><br><input type='text' name='sched_s' value='{schedStart}' placeholder='05:45'></div>
-                                        <div><label>{LanguageManager.Get("ScheduleEndLabel")}</label><br><input type='text' name='sched_e' value='{schedEnd}' placeholder='22:15'></div>
+                                        <div><label title='{LanguageManager.Get("TipScheduleStart")}'>{LanguageManager.Get("ScheduleStartLabel")}</label><br><input type='text' name='sched_s' title='{LanguageManager.Get("TipScheduleStart")}' value='{schedStart}' placeholder='05:45'></div>
+                                        <div><label title='{LanguageManager.Get("TipScheduleEnd")}'>{LanguageManager.Get("ScheduleEndLabel")}</label><br><input type='text' name='sched_e' title='{LanguageManager.Get("TipScheduleEnd")}' value='{schedEnd}' placeholder='22:15'></div>
                                     </div>
                                 </div>
 
                                 <div id='tab-config' class='tabcontent'>
-                                    <div><label title='{LanguageManager.Get("TipTheme")}'>{LanguageManager.Get("ThemeLabel")}</label><br><select name='theme'>{themeOptions}</select></div><br>
-                                    <div><label title='{LanguageManager.Get("TipLanguage")}'>{LanguageManager.Get("LanguageLabel")}</label><br><select name='lang'>{langOptions}</select></div><br>
+                                    <div><label title='{LanguageManager.Get("TipTheme")}'>{LanguageManager.Get("ThemeLabel")}</label><br><select name='theme' title='{LanguageManager.Get("TipTheme")}'>{themeOptions}</select></div><br>
+                                    <div><label title='{LanguageManager.Get("TipLanguage")}'>{LanguageManager.Get("LanguageLabel")}</label><br><select name='lang' title='{LanguageManager.Get("TipLanguage")}'>{langOptions}</select></div><br>
                                 </div>
                                 
                                 <div id='tab-logs' class='tabcontent' style='padding:0'>

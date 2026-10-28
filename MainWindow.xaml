@@ -284,12 +284,12 @@
 
                     <!-- TAB 5: LOGS -->
                     <Grid x:Name="PageLogs" Visibility="Collapsed" RowDefinitions="Auto,*">
-                        <Grid Grid.Row="0" Margin="0,0,0,10" ColumnDefinitions="*,Auto">
+                        <Grid Grid.Row="0" Margin="0,0,0,16" ColumnDefinitions="*,Auto">
                             <TextBlock
                                 Text="Logs"
                                 Style="{StaticResource TitleTextBlockStyle}"
                                 VerticalAlignment="Center" />
-                            <Button x:Name="BtnClearLogs" Grid.Column="1" Click="BtnClearLogs_Click" CornerRadius="16">
+                            <Button x:Name="BtnClearLogs" Grid.Column="1" Click="BtnClearLogs_Click" CornerRadius="16" VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <FontIcon Glyph="&#xE74D;" FontSize="14" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                                     <TextBlock Text="Limpar" />
@@ -319,7 +319,7 @@
 
                     <!-- TAB 6: ABOUT -->
                     <ScrollViewer x:Name="PageAbout" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-                        <StackPanel Spacing="8" Padding="0,0,0,12">
+                        <StackPanel Spacing="6" Padding="0,0,0,12">
                             <TextBlock
                                 x:Name="HeaderAbout"
                                 Text="Sobre"
