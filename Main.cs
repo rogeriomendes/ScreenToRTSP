@@ -514,7 +514,11 @@ namespace ScreenToRTSP
                 // About Cards
                 lblAboutTitle.Text = LanguageManager.Get("AppTitle");
                 lblAboutDesc.Text = LanguageManager.Get("AboutDesc");
+                lblAuthor.Text = LanguageManager.Get("DevelopedBy");
                 CardAppVersion.Header = LanguageManager.Get("AppTitle");
+                CardRepository.Header = LanguageManager.Get("ProjectRepository");
+                ToolTipService.SetToolTip(CardRepository, LanguageManager.Get("TipRepository"));
+                ToolTipService.SetToolTip(lnkAuthor, LanguageManager.Get("TipRepository"));
                 RefreshAboutVersionLabels();
 
                 LblBtnCheckUpdates.Text = LanguageManager.Get("BtnCheckUpdates");
@@ -707,6 +711,15 @@ namespace ScreenToRTSP
                     _logWriter?.FlushToUI();
                 }
             }
+        }
+
+        private void LnkRepo_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo("https://github.com/rogeriomendes/ScreenToRTSP") { UseShellExecute = true });
+            }
+            catch { }
         }
 
         private void BtnClearLogs_Click(object sender, RoutedEventArgs e)

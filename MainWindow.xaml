@@ -350,6 +350,17 @@
                                             x:Name="lblAboutDesc"
                                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                             TextWrapping="Wrap" />
+                                        <HyperlinkButton
+                                            x:Name="lnkAuthor"
+                                            Click="LnkRepo_Click"
+                                            Padding="0"
+                                            Margin="0,4,0,0">
+                                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                <FontIcon Glyph="&#xE77B;" FontSize="12" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                                <TextBlock x:Name="lblAuthor" Text="Desenvolvido por Rogério Mendes" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <FontIcon Glyph="&#xE8A7;" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                            </StackPanel>
+                                        </HyperlinkButton>
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -389,6 +400,16 @@
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <TextBlock x:Name="lblMediaMTXVersion" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     <TextBlock x:Name="lblMediaMTXUpdate" Foreground="{ThemeResource SystemFillColorCriticalBrush}" FontWeight="Bold" />
+                                </StackPanel>
+                            </controls:SettingsCard>
+
+                            <controls:SettingsCard x:Name="CardRepository" IsClickEnabled="True" Click="LnkRepo_Click">
+                                <controls:SettingsCard.HeaderIcon>
+                                    <FontIcon Glyph="&#xEC27;" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                </controls:SettingsCard.HeaderIcon>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="github.com/rogeriomendes/ScreenToRTSP" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                    <FontIcon Glyph="&#xE8A7;" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 </StackPanel>
                             </controls:SettingsCard>
 

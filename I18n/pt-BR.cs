@@ -106,7 +106,10 @@ namespace ScreenToRTSP.I18n
             {"MsgUpdateSuccess", "Atualização concluída com sucesso!"},
             {"BtnCheckUpdates", "Verificar Atualizações"},
             {"MsgNoUpdate", "Você já possui a versão mais recente do aplicativo e componentes."},
-            {"MsgCheckUpdateError", "Erro ao verificar atualizações. Verifique sua conexão ou tente mais tarde."}
+            {"MsgCheckUpdateError", "Erro ao verificar atualizações. Verifique sua conexão ou tente mais tarde."},
+            {"DevelopedBy", "Desenvolvido por Rogério Mendes"},
+            {"ProjectRepository", "Repositório do Projeto"},
+            {"TipRepository", "Abrir o repositório oficial no GitHub."}
         };
     }
 }

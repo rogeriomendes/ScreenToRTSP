@@ -642,7 +642,12 @@ namespace ScreenToRTSP.UI
                                 <div id='tab-sobre' class='tabcontent'>
                                     <div style='text-align:center; padding: 20px 0;'>
                                         <h3 style='color:#16a34a; margin:0;'>{LanguageManager.Get("AppTitle")}</h3>
-                                        <p style='color:#475569; font-size:14px;'>{LanguageManager.Get("AboutDesc")}</p>
+                                        <p style='color:#475569; font-size:14px; margin-bottom:8px;'>{LanguageManager.Get("AboutDesc")}</p>
+                                        <p style='font-size:13px; margin:0 0 16px 0;'>
+                                            <a href='https://github.com/rogeriomendes/ScreenToRTSP' target='_blank' style='color:#16a34a; text-decoration:none; font-weight:600;'>
+                                                {LanguageManager.Get("DevelopedBy")} &bull; GitHub
+                                            </a>
+                                        </p>
                                         {versionsHtml}
                                         {updateHtml}
                                     </div>
