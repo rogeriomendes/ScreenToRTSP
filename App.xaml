@@ -6,6 +6,142 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+                <ResourceDictionary>
+                    <ResourceDictionary.ThemeDictionaries>
+                        <!-- Dark Palette -->
+                        <ResourceDictionary x:Key="Default">
+                            <SolidColorBrush x:Key="AppShellBackgroundBrush" Color="#070707" />
+                            <SolidColorBrush x:Key="AppSheetBackgroundBrush" Color="#121212" />
+                            <SolidColorBrush x:Key="AppSheetBorderBrush" Color="#222222" />
+                            <SolidColorBrush x:Key="AppBottomBarBackgroundBrush" Color="#090909" />
+
+                            <SolidColorBrush x:Key="ApplicationPageBackgroundThemeBrush" Color="#070707" />
+                            <SolidColorBrush x:Key="SolidBackgroundFillColorBaseBrush" Color="#121212" />
+                            <SolidColorBrush x:Key="LayerFillColorDefaultBrush" Color="#121212" />
+
+                            <!-- Cards (#181818 on #121212 sheet) -->
+                            <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#181818" />
+                            <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="#202020" />
+                            <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="#282828" />
+
+                            <!-- Controls (ComboBox, TextBox, Buttons) -->
+                            <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="#242424" />
+                            <SolidColorBrush x:Key="ControlFillColorSecondaryBrush" Color="#2E2E2E" />
+                            <SolidColorBrush x:Key="ControlFillColorTertiaryBrush" Color="#1E1E1E" />
+                            <SolidColorBrush x:Key="ControlFillColorInputActiveBrush" Color="#1E1E1E" />
+                            <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush" Color="#333333" />
+                            <SolidColorBrush x:Key="ControlStrokeColorSecondaryBrush" Color="#3E3E3E" />
+
+                            <!-- Typography (#FFFFFF primary, #B3B3B3 Spotify secondary) -->
+                            <SolidColorBrush x:Key="TextFillColorPrimaryBrush" Color="#FFFFFF" />
+                            <SolidColorBrush x:Key="TextFillColorSecondaryBrush" Color="#B3B3B3" />
+
+                            <!-- NavigationView Transparent Shell -->
+                            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="Transparent" />
+                            <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="Transparent" />
+                            <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
+                            <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="Transparent" />
+                            <SolidColorBrush x:Key="SubtleFillColorSecondaryBrush" Color="#1A1A1A" />
+                            <SolidColorBrush x:Key="SubtleFillColorTertiaryBrush" Color="#242424" />
+
+                            <!-- Brand Green Accent (Buttons, ToggleSwitches, Active Indicators) -->
+                            <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#16A34A" />
+                            <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#22C55E" />
+                            <SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#15803D" />
+                            <SolidColorBrush x:Key="TextOnAccentFillColorPrimaryBrush" Color="#FFFFFF" />
+                            <SolidColorBrush x:Key="TextOnAccentFillColorSecondaryBrush" Color="#F0FDF4" />
+                            <SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush" Color="#22C55E" />
+                            <SolidColorBrush x:Key="AccentTextFillColorSecondaryBrush" Color="#4ADE80" />
+                            <SolidColorBrush x:Key="AccentTextFillColorTertiaryBrush" Color="#16A34A" />
+                            <SolidColorBrush x:Key="NavigationViewSelectionIndicatorForeground" Color="#22C55E" />
+                        </ResourceDictionary>
+
+                        <ResourceDictionary x:Key="Dark">
+                            <SolidColorBrush x:Key="AppShellBackgroundBrush" Color="#070707" />
+                            <SolidColorBrush x:Key="AppSheetBackgroundBrush" Color="#121212" />
+                            <SolidColorBrush x:Key="AppSheetBorderBrush" Color="#222222" />
+                            <SolidColorBrush x:Key="AppBottomBarBackgroundBrush" Color="#090909" />
+
+                            <SolidColorBrush x:Key="ApplicationPageBackgroundThemeBrush" Color="#070707" />
+                            <SolidColorBrush x:Key="SolidBackgroundFillColorBaseBrush" Color="#121212" />
+                            <SolidColorBrush x:Key="LayerFillColorDefaultBrush" Color="#121212" />
+
+                            <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#181818" />
+                            <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="#202020" />
+                            <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="#282828" />
+
+                            <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="#242424" />
+                            <SolidColorBrush x:Key="ControlFillColorSecondaryBrush" Color="#2E2E2E" />
+                            <SolidColorBrush x:Key="ControlFillColorTertiaryBrush" Color="#1E1E1E" />
+                            <SolidColorBrush x:Key="ControlFillColorInputActiveBrush" Color="#1E1E1E" />
+                            <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush" Color="#333333" />
+                            <SolidColorBrush x:Key="ControlStrokeColorSecondaryBrush" Color="#3E3E3E" />
+
+                            <SolidColorBrush x:Key="TextFillColorPrimaryBrush" Color="#FFFFFF" />
+                            <SolidColorBrush x:Key="TextFillColorSecondaryBrush" Color="#B3B3B3" />
+
+                            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="Transparent" />
+                            <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="Transparent" />
+                            <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
+                            <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="Transparent" />
+                            <SolidColorBrush x:Key="SubtleFillColorSecondaryBrush" Color="#1A1A1A" />
+                            <SolidColorBrush x:Key="SubtleFillColorTertiaryBrush" Color="#242424" />
+
+                            <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#16A34A" />
+                            <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#22C55E" />
+                            <SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#15803D" />
+                            <SolidColorBrush x:Key="TextOnAccentFillColorPrimaryBrush" Color="#FFFFFF" />
+                            <SolidColorBrush x:Key="TextOnAccentFillColorSecondaryBrush" Color="#F0FDF4" />
+                            <SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush" Color="#22C55E" />
+                            <SolidColorBrush x:Key="AccentTextFillColorSecondaryBrush" Color="#4ADE80" />
+                            <SolidColorBrush x:Key="AccentTextFillColorTertiaryBrush" Color="#16A34A" />
+                            <SolidColorBrush x:Key="NavigationViewSelectionIndicatorForeground" Color="#22C55E" />
+                        </ResourceDictionary>
+
+                        <!-- Light Palette -->
+                        <ResourceDictionary x:Key="Light">
+                            <SolidColorBrush x:Key="AppShellBackgroundBrush" Color="#EAECE9" />
+                            <SolidColorBrush x:Key="AppSheetBackgroundBrush" Color="#F6F7F6" />
+                            <SolidColorBrush x:Key="AppSheetBorderBrush" Color="#DCDFD9" />
+                            <SolidColorBrush x:Key="AppBottomBarBackgroundBrush" Color="#F0F2EF" />
+
+                            <SolidColorBrush x:Key="ApplicationPageBackgroundThemeBrush" Color="#EAECE9" />
+                            <SolidColorBrush x:Key="SolidBackgroundFillColorBaseBrush" Color="#F6F7F6" />
+                            <SolidColorBrush x:Key="LayerFillColorDefaultBrush" Color="#F6F7F6" />
+
+                            <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#FFFFFF" />
+                            <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="#F9FAF9" />
+                            <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="#E2E5E0" />
+
+                            <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="#F2F4F1" />
+                            <SolidColorBrush x:Key="ControlFillColorSecondaryBrush" Color="#E6EAE5" />
+                            <SolidColorBrush x:Key="ControlFillColorTertiaryBrush" Color="#ECEFEA" />
+                            <SolidColorBrush x:Key="ControlFillColorInputActiveBrush" Color="#FFFFFF" />
+                            <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush" Color="#CFD5CE" />
+                            <SolidColorBrush x:Key="ControlStrokeColorSecondaryBrush" Color="#BFC7BE" />
+
+                            <SolidColorBrush x:Key="TextFillColorPrimaryBrush" Color="#121212" />
+                            <SolidColorBrush x:Key="TextFillColorSecondaryBrush" Color="#535353" />
+
+                            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="Transparent" />
+                            <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="Transparent" />
+                            <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
+                            <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="Transparent" />
+                            <SolidColorBrush x:Key="SubtleFillColorSecondaryBrush" Color="#DDE3DC" />
+                            <SolidColorBrush x:Key="SubtleFillColorTertiaryBrush" Color="#D2DAD1" />
+
+                            <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#16A34A" />
+                            <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#15803D" />
+                            <SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#166534" />
+                            <SolidColorBrush x:Key="TextOnAccentFillColorPrimaryBrush" Color="#FFFFFF" />
+                            <SolidColorBrush x:Key="TextOnAccentFillColorSecondaryBrush" Color="#F0FDF4" />
+                            <SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush" Color="#16A34A" />
+                            <SolidColorBrush x:Key="AccentTextFillColorSecondaryBrush" Color="#15803D" />
+                            <SolidColorBrush x:Key="AccentTextFillColorTertiaryBrush" Color="#166534" />
+                            <SolidColorBrush x:Key="NavigationViewSelectionIndicatorForeground" Color="#16A34A" />
+                        </ResourceDictionary>
+                    </ResourceDictionary.ThemeDictionaries>
+                </ResourceDictionary>
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Brand Green Accent Overrides for WinUI 3 -->
