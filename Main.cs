@@ -537,7 +537,7 @@ namespace ScreenToRTSP
 
                 ToolTipService.SetToolTip(btnStart, isTransmitting ? LanguageManager.Get("TipBtnStop") : LanguageManager.Get("TipBtnStart"));
                 UpdateUrlStatus();
-                trayIcon?.SetTooltip(LanguageManager.Get("AppTitle"));
+                UpdateStartStopVisuals();
             }
             finally
             {
@@ -560,7 +560,7 @@ namespace ScreenToRTSP
         private void SetupTrayIcon()
         {
             trayIcon = new TrayIconService();
-            trayIcon.SetTooltip(LanguageManager.Get("AppTitle"));
+            trayIcon.SetTooltip($"{LanguageManager.Get("AppTitle")} - {(isTransmitting ? LanguageManager.Get("StatusRunning") : LanguageManager.Get("StatusStopped"))}");
             trayIcon.IsTransmittingProvider = () => isTransmitting;
             trayIcon.IsWebServerEnabledProvider = () => isWebServerRunning;
             trayIcon.MenuLabelsProvider = () => (
@@ -993,23 +993,56 @@ namespace ScreenToRTSP
 
         private void UpdateStartStopVisuals()
         {
+            string baseTitle = LanguageManager.Get("AppTitle");
+            string runningStatus = LanguageManager.Get("StatusRunning");
+            string stoppedStatus = LanguageManager.Get("StatusStopped");
+
             if (isTransmitting)
             {
                 IconBtnStart.Glyph = "\uE71A"; // Stop symbol
                 LblBtnStart.Text = LanguageManager.Get("BtnStop");
                 ToolTipService.SetToolTip(btnStart, LanguageManager.Get("TipBtnStop"));
-                lblStatus.Text = $"{LanguageManager.Get("StatusPrefix")}{LanguageManager.Get("StatusRunning")}";
+                lblStatus.Text = $"{LanguageManager.Get("StatusPrefix")}{runningStatus}";
                 _brushRunning ??= new SolidColorBrush(Color.FromArgb(255, 34, 197, 94));
                 StatusDot.Fill = _brushRunning;
+
+                // Título da Janela e Barra de Tarefas (Taskbar tooltip)
+                string windowTitle = $"● [{runningStatus}] {baseTitle}";
+                this.Title = windowTitle;
+                if (_appWindow != null) _appWindow.Title = windowTitle;
+
+                // Badge no cabeçalho personalizado da janela (TitleBar)
+                if (BadgeTitleStreaming != null)
+                {
+                    BadgeTitleStreaming.Visibility = Visibility.Visible;
+                    if (lblTitleStreaming != null) lblTitleStreaming.Text = runningStatus.ToUpperInvariant();
+                    ToolTipService.SetToolTip(BadgeTitleStreaming, $"{baseTitle} - {runningStatus}");
+                }
+
+                // Tooltip do ícone na bandeja do sistema
+                trayIcon?.SetTooltip($"{baseTitle} - {runningStatus}");
             }
             else
             {
                 IconBtnStart.Glyph = "\uE768"; // Play symbol
                 LblBtnStart.Text = LanguageManager.Get("BtnStart");
                 ToolTipService.SetToolTip(btnStart, LanguageManager.Get("TipBtnStart"));
-                lblStatus.Text = $"{LanguageManager.Get("StatusPrefix")}{LanguageManager.Get("StatusStopped")}";
+                lblStatus.Text = $"{LanguageManager.Get("StatusPrefix")}{stoppedStatus}";
                 _brushStopped ??= new SolidColorBrush(Color.FromArgb(255, 225, 29, 72));
                 StatusDot.Fill = _brushStopped;
+
+                // Título da Janela e Barra de Tarefas (Taskbar tooltip)
+                this.Title = baseTitle;
+                if (_appWindow != null) _appWindow.Title = baseTitle;
+
+                // Badge no cabeçalho personalizado da janela (TitleBar)
+                if (BadgeTitleStreaming != null)
+                {
+                    BadgeTitleStreaming.Visibility = Visibility.Collapsed;
+                }
+
+                // Tooltip do ícone na bandeja do sistema
+                trayIcon?.SetTooltip($"{baseTitle} - {stoppedStatus}");
             }
         }
 

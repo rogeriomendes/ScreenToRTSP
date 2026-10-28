@@ -29,6 +29,28 @@
                     Style="{StaticResource CaptionTextBlockStyle}"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                     VerticalAlignment="Center" />
+
+                <!-- Streaming Active Indicator Badge in TitleBar -->
+                <Border
+                    x:Name="BadgeTitleStreaming"
+                    Visibility="Collapsed"
+                    Background="#162E1E"
+                    BorderBrush="#22C55E"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Padding="8,2"
+                    VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <Ellipse Width="6" Height="6" Fill="#22C55E" />
+                        <TextBlock
+                            x:Name="lblTitleStreaming"
+                            Text="TRANSMITINDO"
+                            FontSize="10"
+                            FontWeight="Bold"
+                            Foreground="#22C55E"
+                            VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
             </StackPanel>
 
             <!-- Save Status Pill -->
