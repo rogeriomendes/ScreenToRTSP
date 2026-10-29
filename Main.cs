@@ -60,6 +60,7 @@ namespace ScreenToRTSP
         internal WinUITextBoxWriter LogWriter => _logWriter;
         private SolidColorBrush _brushRunning;
         private SolidColorBrush _brushStopped;
+        private Style _defaultBtnStartStyle;
 
         internal string ScheduleStartText
         {
@@ -92,6 +93,7 @@ namespace ScreenToRTSP
         public Main()
         {
             this.InitializeComponent();
+            _defaultBtnStartStyle = btnStart.Style;
             InitializeAppWindow();
 
             configManager = new ConfigManager();
@@ -364,6 +366,7 @@ namespace ScreenToRTSP
                 NavNetwork.Content = LanguageManager.Get("TabNetwork");
                 NavAutomation.Content = LanguageManager.Get("TabAutomation");
                 NavConfig.Content = LanguageManager.Get("TabConfig");
+                NavLogs.Content = LanguageManager.Get("TabLogs");
                 NavAbout.Content = LanguageManager.Get("TabAbout");
 
                 ToolTipService.SetToolTip(NavVideo, LanguageManager.Get("TipTabVideo"));
@@ -377,7 +380,11 @@ namespace ScreenToRTSP
                 HeaderNetwork.Text = LanguageManager.Get("TabNetwork");
                 HeaderAutomation.Text = LanguageManager.Get("TabAutomation");
                 HeaderConfig.Text = LanguageManager.Get("TabConfig");
+                HeaderLogs.Text = LanguageManager.Get("TabLogs");
                 HeaderAbout.Text = LanguageManager.Get("TabAbout");
+
+                LblClearLogs.Text = LanguageManager.Get("BtnClearLogs");
+                ToolTipService.SetToolTip(BtnClearLogs, LanguageManager.Get("TipBtnClearLogs"));
 
                 // Video Cards
                 CardMonitor.Header = LanguageManager.Get("MonitorLabel").TrimEnd(':');
@@ -999,6 +1006,10 @@ namespace ScreenToRTSP
 
             if (isTransmitting)
             {
+                if (Application.Current.Resources.TryGetValue("DangerButtonStyle", out var dangerStyle) && dangerStyle is Style ds)
+                {
+                    btnStart.Style = ds;
+                }
                 IconBtnStart.Glyph = "\uE71A"; // Stop symbol
                 LblBtnStart.Text = LanguageManager.Get("BtnStop");
                 ToolTipService.SetToolTip(btnStart, LanguageManager.Get("TipBtnStop"));
@@ -1024,6 +1035,14 @@ namespace ScreenToRTSP
             }
             else
             {
+                if (_defaultBtnStartStyle != null)
+                {
+                    btnStart.Style = _defaultBtnStartStyle;
+                }
+                else if (Application.Current.Resources.TryGetValue("AccentButtonStyle", out var accentStyle) && accentStyle is Style asStyle)
+                {
+                    btnStart.Style = asStyle;
+                }
                 IconBtnStart.Glyph = "\uE768"; // Play symbol
                 LblBtnStart.Text = LanguageManager.Get("BtnStart");
                 ToolTipService.SetToolTip(btnStart, LanguageManager.Get("TipBtnStart"));

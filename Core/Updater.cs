@@ -32,7 +32,7 @@ namespace ScreenToRTSP.Core
                 }
             }
             catch { }
-            _cachedAppVersion = "2.0.0";
+            _cachedAppVersion = "2.1.0";
             return _cachedAppVersion;
         }
 

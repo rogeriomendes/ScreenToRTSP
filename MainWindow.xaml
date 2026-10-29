@@ -308,13 +308,14 @@
                     <Grid x:Name="PageLogs" Visibility="Collapsed" RowDefinitions="Auto,*">
                         <Grid Grid.Row="0" Margin="0,0,0,16" ColumnDefinitions="*,Auto">
                             <TextBlock
+                                x:Name="HeaderLogs"
                                 Text="Logs"
                                 Style="{StaticResource TitleTextBlockStyle}"
                                 VerticalAlignment="Center" />
                             <Button x:Name="BtnClearLogs" Grid.Column="1" Click="BtnClearLogs_Click" CornerRadius="16" VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <FontIcon Glyph="&#xE74D;" FontSize="14" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
-                                    <TextBlock Text="Limpar" />
+                                    <TextBlock x:Name="LblClearLogs" Text="Limpar" />
                                 </StackPanel>
                             </Button>
                         </Grid>
